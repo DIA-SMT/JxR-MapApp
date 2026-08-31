@@ -1,0 +1,20 @@
+# dependencias
+node_modules/
+
+# next
+.next/
+out/
+next-env.d.ts
+
+# entorno — las credenciales NUNCA se commitean
+.env
+.env.*
+!.env.example
+
+# vercel
+.vercel/
+
+# varios
+*.log
+.DS_Store
+*.tsbuildinfo
