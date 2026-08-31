@@ -141,7 +141,8 @@ export function PanelEspacio({
     });
 
   return (
-    <aside className="panel-vidrio absolute top-3 right-3 bottom-3 z-20 flex w-[360px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-2xl">
+    // bottom 76px: deja libre el botón flotante de Migue (z-40), que si no tapa el formulario
+    <aside className="panel-vidrio absolute top-3 right-3 bottom-[76px] z-20 flex w-[360px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-2xl">
       <div className="flex items-center justify-between border-b border-borde bg-panel-2/60 px-4 py-3">
         <div>
           <div className="text-sm font-extrabold">
