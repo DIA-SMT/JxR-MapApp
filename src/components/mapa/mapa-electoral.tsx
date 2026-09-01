@@ -1,7 +1,7 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import { Layers, Route, Satellite } from "lucide-react";
+import { Box, Layers, Route, Satellite } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Layer,
@@ -27,6 +27,11 @@ const CENTRO_SMT: [number, number] = [-65.2226, -26.8241];
 const ESTILO_MAPA =
   process.env.NEXT_PUBLIC_MAP_STYLE_DARK ??
   "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+
+const COLOR_TERRITORIO: Record<TipoEspacio, string> = {
+  distrito: "#a78bfa",
+  circuito: "#34d399",
+};
 
 // ── Calles: avenidas y corredores realzados desde las teselas del mapa base ──
 // (mismo criterio que CIMBA: el nombre dice "Avenida"/"Av." o es troncal)
@@ -88,93 +93,150 @@ const capaAvenidasNombre: LayerProps = {
 };
 
 // ── Cobertura del operativo: cada espacio teñido según su estado ─────────────
-const COLOR_COBERTURA: [string, string, string, string, string, string] = [
-  "sin", "#ff3b30",
-  "en_curso", "#f4dc00",
-  "completo", "#199e70",
-];
+const COLOR_ESTADO = ["match", ["get", "estado"], "sin", "#ff3b30", "en_curso", "#f4dc00", "completo", "#199e70", "#6b7280"] as const;
 
 const capaRelleno = (tipo: TipoEspacio, verCobertura: boolean): LayerProps => ({
   id: `${tipo}-relleno`,
   type: "fill",
   source: tipo,
   paint: {
-    "fill-color": ["match", ["get", "estado"], ...COLOR_COBERTURA, "#6b7280"],
+    "fill-color": [...COLOR_ESTADO] as never,
     "fill-opacity": verCobertura
-      ? ["match", ["get", "estado"], "sin", 0.08, "en_curso", 0.14, "completo", 0.18, 0]
-      : 0.02,
+      ? (["match", ["get", "estado"], "sin", 0.14, "en_curso", 0.22, "completo", 0.26, 0] as never)
+      : 0.03,
   },
 });
 
-const capaDistritosLinea = (activa: boolean): LayerProps => ({
-  id: "distrito-linea",
-  type: "line",
-  source: "distrito",
+/**
+ * Vista 3D: cada espacio se extruye según el operativo — los espacios sin
+ * asignar quedan chatos (y rojos); los asignados crecen con cada persona y
+ * cada tarea pendiente. El mapa se lee de un vistazo aun inclinado.
+ */
+const capa3D = (tipo: TipoEspacio): LayerProps => ({
+  id: `${tipo}-3d`,
+  type: "fill-extrusion",
+  source: tipo,
   paint: {
-    "line-color": "#a78bfa",
-    "line-opacity": activa ? 0.8 : 0.35,
-    "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1, 14, 2, 17, 3],
-    "line-dasharray": [4, 2],
-  },
-});
-const capaCircuitosLinea = (activa: boolean): LayerProps => ({
-  id: "circuito-linea",
-  type: "line",
-  source: "circuito",
-  paint: {
-    "line-color": "#34d399",
-    "line-opacity": activa ? 0.75 : 0.3,
-    "line-width": ["interpolate", ["linear"], ["zoom"], 11, 0.8, 14, 1.4, 17, 2.2],
-    "line-dasharray": [1, 1.6],
-  },
-});
-
-const capaDistritosNombre: LayerProps = {
-  id: "distrito-nombre",
-  type: "symbol",
-  source: "distrito",
-  minzoom: 11,
-  layout: {
-    "text-field": [
+    "fill-extrusion-color": [...COLOR_ESTADO] as never,
+    "fill-extrusion-height": [
       "case",
-      [">", ["get", "personas"], 0],
-      ["concat", ["get", "nombre"], " · ", ["to-string", ["get", "personas"]], " pers."],
-      ["get", "nombre"],
+      ["==", ["get", "estado"], "sin"],
+      140,
+      ["+", 320, ["*", ["get", "personas"], 450], ["*", ["-", ["get", "tareas"], ["get", "hechas"]], 160]],
     ],
-    "text-font": ["Open Sans Bold"],
-    "text-size": 12,
+    "fill-extrusion-base": 0,
+    "fill-extrusion-opacity": 0.78,
   },
-  paint: { "text-color": "#a78bfa", "text-halo-color": "#070a10", "text-halo-width": 1.6 },
-};
-const capaCircuitosNombre: LayerProps = {
-  id: "circuito-nombre",
-  type: "symbol",
-  source: "circuito",
-  minzoom: 12,
-  layout: {
-    "text-field": ["concat", "Circuito ", ["get", "codigo"]],
-    "text-font": ["Open Sans Regular"],
-    "text-size": 10.5,
-  },
-  paint: { "text-color": "#34d399", "text-halo-color": "#070a10", "text-halo-width": 1.4 },
-};
+});
 
-/** Contorno del espacio bajo el cursor. */
-const capaHover = (tipo: TipoEspacio, codigo: string): LayerProps => ({
-  id: `${tipo}-hover`,
+// ── Límites BIEN marcados: brillo + casing oscuro + línea sólida ─────────────
+const capaGlow = (tipo: TipoEspacio, activa: boolean): LayerProps => ({
+  id: `${tipo}-glow`,
+  type: "line",
+  source: tipo,
+  layout: { "line-cap": "round", "line-join": "round" },
+  paint: {
+    "line-color": COLOR_TERRITORIO[tipo],
+    "line-opacity": activa ? 0.38 : 0.14,
+    "line-blur": 5,
+    "line-width": ["interpolate", ["linear"], ["zoom"], 11, activa ? 7 : 4, 14, activa ? 12 : 6, 17, activa ? 18 : 9],
+  },
+});
+
+const capaCasing = (tipo: TipoEspacio, activa: boolean): LayerProps => ({
+  id: `${tipo}-casing`,
+  type: "line",
+  source: tipo,
+  layout: { "line-cap": "round", "line-join": "round" },
+  paint: {
+    "line-color": "#05070c",
+    "line-opacity": activa ? 0.9 : 0.55,
+    "line-width": ["interpolate", ["linear"], ["zoom"], 11, activa ? 4 : 2.2, 14, activa ? 6.5 : 3.2, 17, activa ? 9 : 4.5],
+  },
+});
+
+const capaLinea = (tipo: TipoEspacio, activa: boolean): LayerProps => ({
+  id: `${tipo}-linea`,
+  type: "line",
+  source: tipo,
+  layout: { "line-cap": "round", "line-join": "round" },
+  paint: {
+    "line-color": COLOR_TERRITORIO[tipo],
+    "line-opacity": activa ? 0.95 : 0.5,
+    "line-width": ["interpolate", ["linear"], ["zoom"], 11, activa ? 1.8 : 1, 14, activa ? 3.2 : 1.6, 17, activa ? 5 : 2.4],
+    // la capa activa va sólida y gruesa; la de contexto conserva el punteado
+    ...(activa ? {} : { "line-dasharray": tipo === "distrito" ? [4, 2] : [1, 1.6] }),
+  },
+});
+
+const capaNombre = (tipo: TipoEspacio): LayerProps => ({
+  id: `${tipo}-nombre`,
+  type: "symbol",
+  source: tipo,
+  minzoom: tipo === "distrito" ? 10 : 11,
+  layout: {
+    "text-field":
+      tipo === "distrito"
+        ? ([
+            "case",
+            [">", ["get", "personas"], 0],
+            ["concat", ["get", "nombre"], "\n", ["to-string", ["get", "personas"]], " pers. · ", ["to-string", ["get", "hechas"]], "/", ["to-string", ["get", "tareas"]], " tareas"],
+            ["get", "nombre"],
+          ] as never)
+        : ([
+            "case",
+            [">", ["get", "personas"], 0],
+            ["concat", "Circuito ", ["get", "codigo"], "\n", ["to-string", ["get", "personas"]], " pers."],
+            ["concat", "Circuito ", ["get", "codigo"]],
+          ] as never),
+    "text-font": ["Open Sans Bold"],
+    "text-size":
+      tipo === "distrito"
+        ? (["interpolate", ["linear"], ["zoom"], 11, 13, 14, 17] as never)
+        : (["interpolate", ["linear"], ["zoom"], 11, 11, 14, 14.5] as never),
+    "text-line-height": 1.25,
+    "text-letter-spacing": 0.03,
+  },
+  paint: {
+    "text-color": COLOR_TERRITORIO[tipo],
+    "text-halo-color": "#05070c",
+    "text-halo-width": 2.2,
+    "text-halo-blur": 0.5,
+  },
+});
+
+/** Resaltado del espacio bajo el cursor: tinte + contorno blanco. */
+const capaHoverRelleno = (tipo: TipoEspacio, codigo: string): LayerProps => ({
+  id: `${tipo}-hover-relleno`,
+  type: "fill",
+  source: tipo,
+  filter: ["==", ["get", "codigo"], codigo],
+  paint: { "fill-color": "#edf2fa", "fill-opacity": 0.09 },
+});
+const capaHoverLinea = (tipo: TipoEspacio, codigo: string): LayerProps => ({
+  id: `${tipo}-hover-linea`,
   type: "line",
   source: tipo,
   filter: ["==", ["get", "codigo"], codigo],
-  paint: { "line-color": "#edf2fa", "line-width": 2, "line-opacity": 0.7 },
+  layout: { "line-cap": "round", "line-join": "round" },
+  paint: { "line-color": "#edf2fa", "line-width": 2.6, "line-opacity": 0.85 },
 });
 
-/** Contorno grueso amarillo del espacio seleccionado (mismo foco que CIMBA). */
+/** Foco amarillo del espacio seleccionado, con su propio brillo. */
+const capaSeleccionGlow = (tipo: TipoEspacio, codigo: string): LayerProps => ({
+  id: `${tipo}-seleccion-glow`,
+  type: "line",
+  source: tipo,
+  filter: ["==", ["get", "codigo"], codigo],
+  paint: { "line-color": "#f4dc00", "line-width": 12, "line-blur": 6, "line-opacity": 0.45 },
+});
 const capaSeleccion = (tipo: TipoEspacio, codigo: string): LayerProps => ({
   id: `${tipo}-seleccion`,
   type: "line",
   source: tipo,
   filter: ["==", ["get", "codigo"], codigo],
-  paint: { "line-color": "#f4dc00", "line-width": 3, "line-opacity": 0.9 },
+  layout: { "line-cap": "round", "line-join": "round" },
+  paint: { "line-color": "#f4dc00", "line-width": 4, "line-opacity": 0.95 },
 });
 
 /** bbox recursivo de una geometría GeoJSON (Polygon/MultiPolygon). */
@@ -207,6 +269,7 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
   const [seleccion, setSeleccion] = useState<SeleccionEspacio | null>(null);
   const [hover, setHover] = useState<{ codigo: string; x: number; y: number } | null>(null);
   const [verCobertura, setVerCobertura] = useState(true);
+  const [ver3D, setVer3D] = useState(false);
   const [verSatelite, setVerSatelite] = useState(false);
   const [verAvenidas, setVerAvenidas] = useState(true);
   const [hayAnclaEtiquetas, setHayAnclaEtiquetas] = useState(true);
@@ -246,6 +309,7 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
   const distritos = useMemo(() => enriquecer(distritosGeo, "distrito"), [distritosGeo, porEspacio]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const circuitos = useMemo(() => enriquecer(circuitosGeo, "circuito"), [circuitosGeo, porEspacio]);
+  const geoPorTipo: Record<TipoEspacio, FCPoligono | null> = { distrito: distritos, circuito: circuitos };
 
   const volarAEspacio = (tipo: TipoEspacio, codigo: string) => {
     const geo = tipo === "distrito" ? distritosGeo : circuitosGeo;
@@ -254,12 +318,29 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
     );
     if (!f) return;
     const [minLon, minLat, maxLon, maxLat] = bboxDeCoordenadas(f.geometry.coordinates);
-    if (Number.isFinite(minLon)) {
-      mapRef.current?.getMap()?.fitBounds([[minLon, minLat], [maxLon, maxLat]], { padding: 90, duration: 1100 });
-    }
+    const mapa = mapRef.current?.getMap();
+    if (!mapa || !Number.isFinite(minLon)) return;
+    mapa.fitBounds([[minLon, minLat], [maxLon, maxLat]], {
+      // el panel del espacio ocupa ~380 px a la derecha: el polígono queda a la vista
+      padding: { top: 90, bottom: 60, left: 60, right: 440 },
+      maxZoom: 15,
+      duration: 1000,
+      pitch: mapa.getPitch(),
+      bearing: mapa.getBearing(),
+    });
   };
   const volarRef = useRef(volarAEspacio);
   volarRef.current = volarAEspacio;
+
+  /** Inclinar/enderezar la cámara al entrar y salir del modo 3D. */
+  const alternar3D = () => {
+    const mapa = mapRef.current?.getMap();
+    setVer3D((v) => {
+      const nuevo = !v;
+      mapa?.easeTo(nuevo ? { pitch: 58, bearing: -20, duration: 1000 } : { pitch: 0, bearing: 0, duration: 800 });
+      return nuevo;
+    });
+  };
 
   // Migue (u otro link) acciona el mapa: seleccionar y encuadrar un espacio
   useEffect(() => {
@@ -292,6 +373,7 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
     }
     const codigo = String(f.properties.codigo);
     setSeleccion({ tipo: tipoActivo, codigo });
+    volarRef.current(tipoActivo, codigo);
   };
 
   const alMover = (e: MapLayerMouseEvent) => {
@@ -319,6 +401,8 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
   const resumenHover = hover ? porEspacio.get(claveEspacio(tipoActivo, hover.codigo)) : null;
   const resumenSeleccion = seleccion ? porEspacio.get(claveEspacio(seleccion.tipo, seleccion.codigo)) : null;
 
+  const tipoContexto: TipoEspacio = tipoActivo === "distrito" ? "circuito" : "distrito";
+
   return (
     <div className="relative h-full w-full">
       <MapaGL
@@ -326,14 +410,14 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
         initialViewState={{ longitude: CENTRO_SMT[0], latitude: CENTRO_SMT[1], zoom: 12.1 }}
         mapStyle={ESTILO_MAPA}
         attributionControl={{ compact: true }}
-        interactiveLayerIds={[`${tipoActivo}-relleno`]}
+        interactiveLayerIds={[ver3D ? `${tipoActivo}-3d` : `${tipoActivo}-relleno`]}
         cursor={hover ? "pointer" : "grab"}
         onClick={alClick}
         onMouseMove={alMover}
         onMouseOut={() => setHover(null)}
         onLoad={(e) => setHayAnclaEtiquetas(e.target.getLayer("roadname_minor") != null)}
       >
-        <NavigationControl position="bottom-right" />
+        <NavigationControl position="bottom-right" visualizePitch />
         <ScaleControl position="bottom-left" />
 
         {verSatelite && (
@@ -356,25 +440,26 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
           </>
         )}
 
-        {distritos && (
-          <Source id="distrito" type="geojson" data={distritos}>
-            {tipoActivo === "distrito" && <Layer {...capaRelleno("distrito", verCobertura)} />}
-            <Layer {...capaDistritosLinea(tipoActivo === "distrito")} />
-            {tipoActivo === "distrito" && <Layer {...capaDistritosNombre} />}
-            {tipoActivo === "distrito" && hover && <Layer {...capaHover("distrito", hover.codigo)} />}
-            {seleccion?.tipo === "distrito" && <Layer {...capaSeleccion("distrito", seleccion.codigo)} />}
-          </Source>
-        )}
-
-        {circuitos && (
-          <Source id="circuito" type="geojson" data={circuitos}>
-            {tipoActivo === "circuito" && <Layer {...capaRelleno("circuito", verCobertura)} />}
-            <Layer {...capaCircuitosLinea(tipoActivo === "circuito")} />
-            {tipoActivo === "circuito" && <Layer {...capaCircuitosNombre} />}
-            {tipoActivo === "circuito" && hover && <Layer {...capaHover("circuito", hover.codigo)} />}
-            {seleccion?.tipo === "circuito" && <Layer {...capaSeleccion("circuito", seleccion.codigo)} />}
-          </Source>
-        )}
+        {/* La capa activa se monta al final para dibujarse encima del contexto */}
+        {([tipoContexto, tipoActivo] as const).map((tipo) => {
+          const geo = geoPorTipo[tipo];
+          if (!geo) return null;
+          const activa = tipo === tipoActivo;
+          return (
+            <Source key={tipo} id={tipo} type="geojson" data={geo}>
+              {activa && !ver3D && <Layer {...capaRelleno(tipo, verCobertura)} />}
+              {activa && ver3D && <Layer {...capa3D(tipo)} />}
+              <Layer {...capaGlow(tipo, activa)} />
+              <Layer {...capaCasing(tipo, activa)} />
+              <Layer {...capaLinea(tipo, activa)} />
+              {activa && hover && <Layer {...capaHoverRelleno(tipo, hover.codigo)} />}
+              {activa && hover && <Layer {...capaHoverLinea(tipo, hover.codigo)} />}
+              {seleccion?.tipo === tipo && <Layer {...capaSeleccionGlow(tipo, seleccion.codigo)} />}
+              {seleccion?.tipo === tipo && <Layer {...capaSeleccion(tipo, seleccion.codigo)} />}
+              {activa && <Layer {...capaNombre(tipo)} />}
+            </Source>
+          );
+        })}
       </MapaGL>
 
       {/* ── Barra superior: modo + KPIs ── */}
@@ -418,6 +503,15 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
 
         <div className="panel-vidrio pointer-events-auto flex items-center gap-1 rounded-xl p-1 text-xs">
           <button
+            onClick={alternar3D}
+            title="Vista 3D: cada espacio se eleva según sus personas asignadas y tareas pendientes"
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold transition ${
+              ver3D ? "bg-amarillo/20 text-amarillo" : "text-texto-3 hover:text-texto"
+            }`}
+          >
+            <Box size={12} /> 3D
+          </button>
+          <button
             onClick={() => setVerCobertura((v) => !v)}
             title="Pintar cada espacio según su estado: sin asignar / en curso / completo"
             className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold transition ${
@@ -454,9 +548,15 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
         <div className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-sm bg-encurso/80" /> En curso</div>
         <div className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-sm bg-completo" /> Checklist completo</div>
         <div className="mt-1.5 border-t border-borde pt-1.5">
-          <div className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-4 bg-distrito" style={{ borderTop: "2px dashed #a78bfa", background: "none" }} /> Distritos</div>
-          <div className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-4" style={{ borderTop: "2px dotted #34d399" }} /> Circuitos</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block w-4" style={{ borderTop: "3px solid #a78bfa" }} /> Distritos</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block w-4" style={{ borderTop: "3px solid #34d399" }} /> Circuitos</div>
         </div>
+        {ver3D && (
+          <div className="mt-1.5 border-t border-borde pt-1.5 text-texto-3">
+            Altura 3D = personas asignadas
+            <br />+ tareas pendientes
+          </div>
+        )}
       </div>
 
       {/* ── Tooltip ── */}

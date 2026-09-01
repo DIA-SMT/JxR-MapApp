@@ -28,10 +28,10 @@ export function useTerritorio() {
 
   const recargar = useCallback(async () => {
     const [p, a, t] = await Promise.all([
-      supabase.from("personas").select("id, nombre, telefono, email, notas").order("nombre"),
+      supabase.from("personas").select("id, nombre, documento, direccion, telefono, email, notas").order("nombre"),
       supabase
         .from("asignaciones")
-        .select("id, persona_id, tipo, codigo, rol_asignacion, personas (id, nombre, telefono, email, notas)")
+        .select("id, persona_id, tipo, codigo, rol_asignacion, personas (id, nombre, documento, direccion, telefono, email, notas)")
         .order("creado_en"),
       supabase.from("tareas").select("id, asignacion_id, titulo, hecha, hecha_en").order("creado_en"),
     ]);

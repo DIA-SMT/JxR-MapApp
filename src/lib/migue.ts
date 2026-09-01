@@ -24,10 +24,10 @@ export const HERRAMIENTAS_MIGUE = [
     function: {
       name: "buscar_persona",
       description:
-        "Busca personas del operativo por nombre, teléfono o email, con sus espacios asignados y avance de tareas.",
+        "Busca personas del operativo por nombre, documento (DNI), teléfono o email, con sus espacios asignados y avance de tareas.",
       parameters: {
         type: "object",
-        properties: { texto: { type: "string", description: "Texto a buscar (ej: 'gómez')" } },
+        properties: { texto: { type: "string", description: "Texto a buscar (ej: 'gómez' o un DNI)" } },
         required: ["texto"],
       },
     },
@@ -98,7 +98,7 @@ async function cargarOperativo(supabase: Supabase) {
   const [a, t] = await Promise.all([
     supabase
       .from("asignaciones")
-      .select("id, persona_id, tipo, codigo, rol_asignacion, personas (id, nombre, telefono, email, notas)"),
+      .select("id, persona_id, tipo, codigo, rol_asignacion, personas (id, nombre, documento, direccion, telefono, email, notas)"),
     supabase.from("tareas").select("id, asignacion_id, titulo, hecha, hecha_en"),
   ]);
   return {
@@ -149,8 +149,8 @@ export async function ejecutarHerramientaMigue(
       const patron = `%${texto}%`;
       const { data: personas } = await supabase
         .from("personas")
-        .select("id, nombre, telefono, email, notas")
-        .or(`nombre.ilike.${patron},telefono.ilike.${patron},email.ilike.${patron}`)
+        .select("id, nombre, documento, direccion, telefono, email, notas")
+        .or(`nombre.ilike.${patron},documento.ilike.${patron},telefono.ilike.${patron},email.ilike.${patron}`)
         .limit(8);
       if (!personas || personas.length === 0) return { resultado: "ninguna persona coincide" };
       const { asignaciones, tareas } = await cargarOperativo(supabase);
@@ -187,6 +187,7 @@ export async function ejecutarHerramientaMigue(
           const r = avance.get(a.id);
           return {
             nombre: a.personas?.nombre,
+            documento: a.personas?.documento,
             telefono: a.personas?.telefono,
             rol: a.rol_asignacion,
             tareas_hechas: r?.hechas ?? 0,
@@ -256,7 +257,7 @@ Personalidad: cercano, tucumano, profesional. Hablás en español rioplatense (v
 
 Contexto del territorio:
 - La ciudad se divide en 20 DISTRITOS oficiales (1 a 20) y 47 CIRCUITOS electorales (1, 1A, 2, 2A… hasta 22; hay letras como 15B o 18G).
-- Una PERSONA puede tener asignados uno o más espacios (distritos o circuitos), con un rol opcional (referente, fiscal, coordinador…).
+- Una PERSONA es alguien real e identificable del territorio (nombre, DNI, dirección, teléfono) — NO es un usuario del sistema. Puede tener asignados uno o más espacios (distritos o circuitos), con un rol opcional (referente, fiscal, coordinador…).
 - Cada asignación tiene un CHECKLIST de tareas que los administradores marcan como hechas.
 - Cobertura: un espacio está "sin asignar" (nadie a cargo), "en curso" (con gente asignada) o "completo" (checklist 100% hecho).
 

@@ -13,6 +13,8 @@ export type TipoEspacio = "distrito" | "circuito";
 export interface Persona {
   id: number;
   nombre: string;
+  documento: string | null;
+  direccion: string | null;
   telefono: string | null;
   email: string | null;
   notas: string | null;

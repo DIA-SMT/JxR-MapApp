@@ -37,7 +37,9 @@ export function PanelEspacio({
   const [rolAsignacion, setRolAsignacion] = useState("");
   const [nuevaPersona, setNuevaPersona] = useState(false);
   const [nuevoNombre, setNuevoNombre] = useState("");
+  const [nuevoDocumento, setNuevoDocumento] = useState("");
   const [nuevoTelefono, setNuevoTelefono] = useState("");
+  const [nuevaDireccion, setNuevaDireccion] = useState("");
   const [tareaNueva, setTareaNueva] = useState<Record<number, string>>({});
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,13 +84,21 @@ export function PanelEspacio({
         if (!nombre) return;
         const { data, error } = await supabase
           .from("personas")
-          .insert({ nombre, telefono: nuevoTelefono.trim() || null, creado_por: usuarioId })
+          .insert({
+            nombre,
+            documento: nuevoDocumento.trim() || null,
+            telefono: nuevoTelefono.trim() || null,
+            direccion: nuevaDireccion.trim() || null,
+            creado_por: usuarioId,
+          })
           .select("id")
           .single();
         if (error) return { error };
         personaId = data.id;
         setNuevoNombre("");
+        setNuevoDocumento("");
         setNuevoTelefono("");
+        setNuevaDireccion("");
         setNuevaPersona(false);
       }
       if (!personaId) return;
@@ -173,8 +183,13 @@ export function PanelEspacio({
                 <div>
                   <div className="text-[13px] font-bold">{a.personas?.nombre ?? `Persona #${a.persona_id}`}</div>
                   <div className="text-[10px] text-texto-3">
-                    {a.rol_asignacion ?? "responsable"}
-                    {a.personas?.telefono ? ` · ${a.personas.telefono}` : ""}
+                    {[
+                      a.rol_asignacion ?? "responsable",
+                      a.personas?.documento ? `DNI ${a.personas.documento}` : null,
+                      a.personas?.telefono,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </div>
                 </div>
                 <button
@@ -254,10 +269,24 @@ export function PanelEspacio({
               placeholder="Nombre y apellido"
               className="w-full rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-celeste/50"
             />
+            <div className="flex gap-1.5">
+              <input
+                value={nuevoDocumento}
+                onChange={(e) => setNuevoDocumento(e.target.value)}
+                placeholder="DNI"
+                className="w-24 rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-celeste/50"
+              />
+              <input
+                value={nuevoTelefono}
+                onChange={(e) => setNuevoTelefono(e.target.value)}
+                placeholder="Teléfono"
+                className="flex-1 rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-celeste/50"
+              />
+            </div>
             <input
-              value={nuevoTelefono}
-              onChange={(e) => setNuevoTelefono(e.target.value)}
-              placeholder="Teléfono (opcional)"
+              value={nuevaDireccion}
+              onChange={(e) => setNuevaDireccion(e.target.value)}
+              placeholder="Dirección (opcional)"
               className="w-full rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-celeste/50"
             />
           </div>
@@ -271,7 +300,8 @@ export function PanelEspacio({
             {personasDisponibles.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.nombre}
-                {p.telefono ? ` (${p.telefono})` : ""}
+                {p.documento ? ` · DNI ${p.documento}` : ""}
+                {p.telefono ? ` · ${p.telefono}` : ""}
               </option>
             ))}
           </select>
