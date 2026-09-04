@@ -230,12 +230,12 @@ export function PanelEspacio({
                     onChange={(e) => setTareaNueva((t) => ({ ...t, [a.id]: e.target.value }))}
                     onKeyDown={(e) => e.key === "Enter" && void agregarTarea(a.id)}
                     placeholder="Nueva tarea del checklist…"
-                    className="flex-1 rounded-lg border border-borde-2 bg-panel px-2 py-1.5 text-[11px] outline-none placeholder:text-texto-3 focus:border-celeste/50"
+                    className="flex-1 rounded-lg border border-borde-2 bg-panel px-2 py-1.5 text-[11px] outline-none placeholder:text-texto-3 focus:border-rosa/50"
                   />
                   <button
                     onClick={() => void agregarTarea(a.id)}
                     disabled={ocupado}
-                    className="rounded-lg bg-azul p-1.5 text-white transition hover:brightness-110 disabled:opacity-40"
+                    className="rounded-lg bg-rosa p-1.5 text-white transition hover:brightness-110 disabled:opacity-40"
                     title="Agregar tarea"
                   >
                     <Plus size={12} />
@@ -255,7 +255,7 @@ export function PanelEspacio({
           </span>
           <button
             onClick={() => setNuevaPersona((v) => !v)}
-            className="flex items-center gap-1 text-[10px] font-semibold text-celeste hover:underline"
+            className="flex items-center gap-1 text-[10px] font-semibold text-rosa hover:underline"
           >
             <UserPlus size={11} /> {nuevaPersona ? "elegir existente" : "nueva persona"}
           </button>
@@ -267,34 +267,34 @@ export function PanelEspacio({
               value={nuevoNombre}
               onChange={(e) => setNuevoNombre(e.target.value)}
               placeholder="Nombre y apellido"
-              className="w-full rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-celeste/50"
+              className="w-full rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-rosa/50"
             />
             <div className="flex gap-1.5">
               <input
                 value={nuevoDocumento}
                 onChange={(e) => setNuevoDocumento(e.target.value)}
                 placeholder="DNI"
-                className="w-24 rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-celeste/50"
+                className="w-24 rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-rosa/50"
               />
               <input
                 value={nuevoTelefono}
                 onChange={(e) => setNuevoTelefono(e.target.value)}
                 placeholder="Teléfono"
-                className="flex-1 rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-celeste/50"
+                className="flex-1 rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-rosa/50"
               />
             </div>
             <input
               value={nuevaDireccion}
               onChange={(e) => setNuevaDireccion(e.target.value)}
               placeholder="Dirección (opcional)"
-              className="w-full rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-celeste/50"
+              className="w-full rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-rosa/50"
             />
           </div>
         ) : (
           <select
             value={personaSel}
             onChange={(e) => setPersonaSel(e.target.value)}
-            className="w-full rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none focus:border-celeste/50"
+            className="w-full rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none focus:border-rosa/50"
           >
             <option value="">— elegir persona —</option>
             {personasDisponibles.map((p) => (
@@ -312,12 +312,12 @@ export function PanelEspacio({
             value={rolAsignacion}
             onChange={(e) => setRolAsignacion(e.target.value)}
             placeholder="Rol (referente, fiscal…)"
-            className="flex-1 rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-celeste/50"
+            className="flex-1 rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-rosa/50"
           />
           <button
             onClick={() => void asignar()}
             disabled={ocupado || (nuevaPersona ? nuevoNombre.trim() === "" : personaSel === "")}
-            className="rounded-lg bg-azul px-3 py-2 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-40"
+            className="rounded-lg bg-rosa px-3 py-2 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-40"
           >
             Asignar
           </button>

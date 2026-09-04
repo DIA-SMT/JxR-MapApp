@@ -222,13 +222,13 @@ const capaHoverLinea = (tipo: TipoEspacio, codigo: string): LayerProps => ({
   paint: { "line-color": "#edf2fa", "line-width": 2.6, "line-opacity": 0.85 },
 });
 
-/** Foco amarillo del espacio seleccionado, con su propio brillo. */
+/** Foco rosa (marca JxR) del espacio seleccionado, con su propio brillo. */
 const capaSeleccionGlow = (tipo: TipoEspacio, codigo: string): LayerProps => ({
   id: `${tipo}-seleccion-glow`,
   type: "line",
   source: tipo,
   filter: ["==", ["get", "codigo"], codigo],
-  paint: { "line-color": "#f4dc00", "line-width": 12, "line-blur": 6, "line-opacity": 0.45 },
+  paint: { "line-color": "#e14f82", "line-width": 12, "line-blur": 6, "line-opacity": 0.5 },
 });
 const capaSeleccion = (tipo: TipoEspacio, codigo: string): LayerProps => ({
   id: `${tipo}-seleccion`,
@@ -236,7 +236,7 @@ const capaSeleccion = (tipo: TipoEspacio, codigo: string): LayerProps => ({
   source: tipo,
   filter: ["==", ["get", "codigo"], codigo],
   layout: { "line-cap": "round", "line-join": "round" },
-  paint: { "line-color": "#f4dc00", "line-width": 4, "line-opacity": 0.95 },
+  paint: { "line-color": "#e14f82", "line-width": 4, "line-opacity": 0.95 },
 });
 
 /** bbox recursivo de una geometría GeoJSON (Polygon/MultiPolygon). */
@@ -492,7 +492,7 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
             <span className="text-texto-3">/47 circuitos</span>
           </span>
           <span title="Personas con al menos un espacio asignado">
-            <span className="num font-bold text-celeste">{kpis.personasAsignadas}</span>
+            <span className="num font-bold text-rosa">{kpis.personasAsignadas}</span>
             <span className="text-texto-3"> personas</span>
           </span>
           <span title="Tareas completadas sobre el total del checklist">

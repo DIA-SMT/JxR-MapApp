@@ -82,7 +82,7 @@ export default function PaginaCambiarPassword() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="mínimo 8 caracteres"
-              className="w-full rounded-xl border border-borde-2 bg-panel-2 px-3 py-2.5 text-sm outline-none placeholder:text-texto-3 focus:border-celeste/60"
+              className="w-full rounded-xl border border-borde-2 bg-panel-2 px-3 py-2.5 text-sm outline-none placeholder:text-texto-3 focus:border-rosa/60"
             />
           </label>
           <label className="block">
@@ -95,7 +95,7 @@ export default function PaginaCambiarPassword() {
               autoComplete="new-password"
               value={confirmar}
               onChange={(e) => setConfirmar(e.target.value)}
-              className="w-full rounded-xl border border-borde-2 bg-panel-2 px-3 py-2.5 text-sm outline-none placeholder:text-texto-3 focus:border-celeste/60"
+              className="w-full rounded-xl border border-borde-2 bg-panel-2 px-3 py-2.5 text-sm outline-none placeholder:text-texto-3 focus:border-rosa/60"
             />
           </label>
 
@@ -108,7 +108,7 @@ export default function PaginaCambiarPassword() {
           <button
             type="submit"
             disabled={guardando}
-            className="w-full rounded-xl bg-azul py-2.5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50"
+            className="w-full rounded-xl bg-rosa py-2.5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50"
           >
             {guardando ? "Guardando…" : "Guardar y entrar"}
           </button>

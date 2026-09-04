@@ -112,7 +112,7 @@ export function MigueChat() {
         <div className="fixed right-4 bottom-4 z-40">
           <button
             onClick={() => setAbierto(true)}
-            className="flex items-center gap-2 rounded-full border border-celeste/40 bg-panel-2 py-2 pr-4 pl-2 shadow-2xl transition select-none hover:border-celeste hover:shadow-celeste/20"
+            className="flex items-center gap-2 rounded-full border border-rosa/40 bg-panel-2 py-2 pr-4 pl-2 shadow-2xl transition select-none hover:border-rosa hover:shadow-rosa/20"
             title="Preguntale a Migue sobre el operativo territorial"
           >
             <Image src="/marca/migue.png" alt="Migue" width={36} height={36} className="rounded-full" />
@@ -152,7 +152,7 @@ export function MigueChat() {
                   <button
                     key={s}
                     onClick={() => void enviar(s)}
-                    className="block w-full rounded-lg border border-borde-2 bg-panel-2 px-3 py-2 text-left text-xs text-texto-2 transition hover:border-celeste/50 hover:text-texto"
+                    className="block w-full rounded-lg border border-borde-2 bg-panel-2 px-3 py-2 text-left text-xs text-texto-2 transition hover:border-rosa/50 hover:text-texto"
                   >
                     {s}
                   </button>
@@ -164,7 +164,7 @@ export function MigueChat() {
                 <div
                   className={`max-w-[85%] rounded-2xl px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap ${
                     m.rol === "usuario"
-                      ? "rounded-br-sm bg-azul text-white"
+                      ? "rounded-br-sm bg-rosa text-white"
                       : "rounded-bl-sm border border-borde bg-panel-2 text-texto"
                   }`}
                 >
@@ -172,7 +172,7 @@ export function MigueChat() {
                   {m.accionMapa && (
                     <button
                       onClick={() => accionarMapa(m.accionMapa!)}
-                      className="mt-1.5 flex items-center gap-1.5 rounded-lg border border-celeste/40 px-2 py-1 text-[10px] font-semibold text-celeste transition hover:border-celeste"
+                      className="mt-1.5 flex items-center gap-1.5 rounded-lg border border-rosa/40 px-2 py-1 text-[10px] font-semibold text-rosa transition hover:border-rosa"
                       title="Volver a encuadrar este espacio en el mapa"
                     >
                       <MapIcon size={11} /> Marcado en el mapa · ver de nuevo
@@ -202,12 +202,12 @@ export function MigueChat() {
                 onChange={(e) => setTexto(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && void enviar(texto)}
                 placeholder="Preguntale a Migue…"
-                className="flex-1 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2.5 text-[13px] outline-none placeholder:text-texto-3 focus:border-celeste/50"
+                className="flex-1 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2.5 text-[13px] outline-none placeholder:text-texto-3 focus:border-rosa/50"
               />
               <button
                 onClick={() => void enviar(texto)}
                 disabled={pensando || texto.trim().length === 0}
-                className="rounded-xl bg-azul p-2.5 text-white transition hover:brightness-110 disabled:opacity-40"
+                className="rounded-xl bg-rosa p-2.5 text-white transition hover:brightness-110 disabled:opacity-40"
               >
                 <Send size={15} />
               </button>

@@ -76,7 +76,7 @@ export function UsuariosAdmin({ miId }: { miId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <UserCog size={18} className="text-celeste" />
+        <UserCog size={18} className="text-rosa" />
         <h1 className="text-lg font-extrabold">Usuarios del sistema</h1>
         <span className="num rounded-full border border-borde-2 px-2 py-0.5 text-[10px] text-texto-2">
           {usuarios.length}
@@ -95,18 +95,18 @@ export function UsuariosAdmin({ miId }: { miId: string }) {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="email@jxr.com"
           type="email"
-          className="min-w-44 flex-1 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2 text-sm outline-none placeholder:text-texto-3 focus:border-celeste/50"
+          className="min-w-44 flex-1 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2 text-sm outline-none placeholder:text-texto-3 focus:border-rosa/50"
         />
         <input
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
           placeholder="Nombre"
-          className="w-36 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2 text-sm outline-none placeholder:text-texto-3 focus:border-celeste/50"
+          className="w-36 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2 text-sm outline-none placeholder:text-texto-3 focus:border-rosa/50"
         />
         <select
           value={rol}
           onChange={(e) => setRol(e.target.value as "admin" | "superadmin")}
-          className="rounded-xl border border-borde-2 bg-panel-2 px-2.5 py-2 text-sm outline-none focus:border-celeste/50"
+          className="rounded-xl border border-borde-2 bg-panel-2 px-2.5 py-2 text-sm outline-none focus:border-rosa/50"
         >
           <option value="admin">Admin</option>
           <option value="superadmin">Superadmin</option>
@@ -116,12 +116,12 @@ export function UsuariosAdmin({ miId }: { miId: string }) {
           onChange={(e) => setPasswordInicial(e.target.value)}
           placeholder="Contraseña inicial"
           title="Contraseña inicial (la debe cambiar al entrar)"
-          className="w-36 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2 text-sm outline-none placeholder:text-texto-3 focus:border-celeste/50"
+          className="w-36 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2 text-sm outline-none placeholder:text-texto-3 focus:border-rosa/50"
         />
         <button
           onClick={() => void crear()}
           disabled={ocupado || email.trim() === "" || nombre.trim() === "" || passwordInicial.length < 6}
-          className="flex items-center gap-1.5 rounded-xl bg-azul px-3.5 py-2 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-40"
+          className="flex items-center gap-1.5 rounded-xl bg-rosa px-3.5 py-2 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-40"
         >
           <Plus size={14} /> Crear
         </button>
@@ -142,7 +142,7 @@ export function UsuariosAdmin({ miId }: { miId: string }) {
                   className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${
                     u.rol === "superadmin"
                       ? "border-amarillo/40 bg-amarillo/10 text-amarillo"
-                      : "border-celeste/40 bg-celeste/10 text-celeste"
+                      : "border-rosa/40 bg-rosa/10 text-rosa"
                   }`}
                 >
                   <ShieldCheck size={9} /> {u.rol}

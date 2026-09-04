@@ -158,7 +158,7 @@ export function PersonasAdmin() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <Users size={18} className="text-celeste" />
+        <Users size={18} className="text-rosa" />
         <h1 className="text-lg font-extrabold">Personas del operativo</h1>
         <span className="num rounded-full border border-borde-2 px-2 py-0.5 text-[10px] text-texto-2">
           {personas.length}
@@ -177,30 +177,30 @@ export function PersonasAdmin() {
           onChange={(e) => setNombre(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && void crear()}
           placeholder="Nombre y apellido"
-          className="min-w-44 flex-1 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2 text-sm outline-none placeholder:text-texto-3 focus:border-celeste/50"
+          className="min-w-44 flex-1 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2 text-sm outline-none placeholder:text-texto-3 focus:border-rosa/50"
         />
         <input
           value={documento}
           onChange={(e) => setDocumento(e.target.value)}
           placeholder="DNI"
-          className="w-32 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2 text-sm outline-none placeholder:text-texto-3 focus:border-celeste/50"
+          className="w-32 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2 text-sm outline-none placeholder:text-texto-3 focus:border-rosa/50"
         />
         <input
           value={telefono}
           onChange={(e) => setTelefono(e.target.value)}
           placeholder="Teléfono"
-          className="w-36 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2 text-sm outline-none placeholder:text-texto-3 focus:border-celeste/50"
+          className="w-36 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2 text-sm outline-none placeholder:text-texto-3 focus:border-rosa/50"
         />
         <input
           value={direccion}
           onChange={(e) => setDireccion(e.target.value)}
           placeholder="Dirección"
-          className="min-w-40 flex-1 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2 text-sm outline-none placeholder:text-texto-3 focus:border-celeste/50"
+          className="min-w-40 flex-1 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2 text-sm outline-none placeholder:text-texto-3 focus:border-rosa/50"
         />
         <button
           onClick={() => void crear()}
           disabled={nombre.trim() === ""}
-          className="flex items-center gap-1.5 rounded-xl bg-azul px-3.5 py-2 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-40"
+          className="flex items-center gap-1.5 rounded-xl bg-rosa px-3.5 py-2 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-40"
         >
           <Plus size={14} /> Agregar
         </button>
@@ -210,7 +210,7 @@ export function PersonasAdmin() {
         value={busqueda}
         onChange={(e) => setBusqueda(e.target.value)}
         placeholder="Buscar por nombre, DNI, teléfono, dirección o email…"
-        className="w-full rounded-xl border border-borde-2 bg-panel-2 px-3 py-2 text-sm outline-none placeholder:text-texto-3 focus:border-celeste/50"
+        className="w-full rounded-xl border border-borde-2 bg-panel-2 px-3 py-2 text-sm outline-none placeholder:text-texto-3 focus:border-rosa/50"
       />
 
       {error && (
@@ -234,39 +234,39 @@ export function PersonasAdmin() {
                   <input
                     value={editando.nombre}
                     onChange={(e) => setEditando({ ...editando, nombre: e.target.value })}
-                    className="min-w-40 flex-1 rounded-lg border border-borde-2 bg-panel-2 px-2.5 py-1.5 text-sm outline-none focus:border-celeste/50"
+                    className="min-w-40 flex-1 rounded-lg border border-borde-2 bg-panel-2 px-2.5 py-1.5 text-sm outline-none focus:border-rosa/50"
                   />
                   <input
                     value={editando.documento ?? ""}
                     onChange={(e) => setEditando({ ...editando, documento: e.target.value })}
                     placeholder="DNI"
-                    className="w-28 rounded-lg border border-borde-2 bg-panel-2 px-2.5 py-1.5 text-sm outline-none focus:border-celeste/50"
+                    className="w-28 rounded-lg border border-borde-2 bg-panel-2 px-2.5 py-1.5 text-sm outline-none focus:border-rosa/50"
                   />
                   <input
                     value={editando.telefono ?? ""}
                     onChange={(e) => setEditando({ ...editando, telefono: e.target.value })}
                     placeholder="Teléfono"
-                    className="w-32 rounded-lg border border-borde-2 bg-panel-2 px-2.5 py-1.5 text-sm outline-none focus:border-celeste/50"
+                    className="w-32 rounded-lg border border-borde-2 bg-panel-2 px-2.5 py-1.5 text-sm outline-none focus:border-rosa/50"
                   />
                   <input
                     value={editando.direccion ?? ""}
                     onChange={(e) => setEditando({ ...editando, direccion: e.target.value })}
                     placeholder="Dirección"
-                    className="min-w-36 flex-1 rounded-lg border border-borde-2 bg-panel-2 px-2.5 py-1.5 text-sm outline-none focus:border-celeste/50"
+                    className="min-w-36 flex-1 rounded-lg border border-borde-2 bg-panel-2 px-2.5 py-1.5 text-sm outline-none focus:border-rosa/50"
                   />
                   <input
                     value={editando.email ?? ""}
                     onChange={(e) => setEditando({ ...editando, email: e.target.value })}
                     placeholder="Email"
-                    className="w-40 rounded-lg border border-borde-2 bg-panel-2 px-2.5 py-1.5 text-sm outline-none focus:border-celeste/50"
+                    className="w-40 rounded-lg border border-borde-2 bg-panel-2 px-2.5 py-1.5 text-sm outline-none focus:border-rosa/50"
                   />
                   <input
                     value={editando.notas ?? ""}
                     onChange={(e) => setEditando({ ...editando, notas: e.target.value })}
                     placeholder="Notas"
-                    className="min-w-36 flex-1 rounded-lg border border-borde-2 bg-panel-2 px-2.5 py-1.5 text-sm outline-none focus:border-celeste/50"
+                    className="min-w-36 flex-1 rounded-lg border border-borde-2 bg-panel-2 px-2.5 py-1.5 text-sm outline-none focus:border-rosa/50"
                   />
-                  <button onClick={() => void guardarEdicion()} className="rounded-lg bg-azul p-2 text-white" title="Guardar">
+                  <button onClick={() => void guardarEdicion()} className="rounded-lg bg-rosa p-2 text-white" title="Guardar">
                     <Save size={13} />
                   </button>
                   <button onClick={() => setEditando(null)} className="rounded-lg border border-borde-2 p-2 text-texto-3" title="Cancelar">
@@ -324,7 +324,7 @@ export function PersonasAdmin() {
                           onClick={() => setExpandida(abierta ? null : p.id)}
                           className={`flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold transition ${
                             abierta
-                              ? "border-celeste/50 text-celeste"
+                              ? "border-rosa/50 text-rosa"
                               : "border-borde-2 text-texto-3 hover:text-texto"
                           }`}
                           title="Ver y cargar las tareas de esta persona"
@@ -400,11 +400,11 @@ export function PersonasAdmin() {
                                   onChange={(e) => setTareaNueva((t) => ({ ...t, [a.id]: e.target.value }))}
                                   onKeyDown={(e) => e.key === "Enter" && void agregarTarea(a.id)}
                                   placeholder="Nueva tarea…"
-                                  className="flex-1 rounded-lg border border-borde-2 bg-panel px-2 py-1.5 text-[11px] outline-none placeholder:text-texto-3 focus:border-celeste/50"
+                                  className="flex-1 rounded-lg border border-borde-2 bg-panel px-2 py-1.5 text-[11px] outline-none placeholder:text-texto-3 focus:border-rosa/50"
                                 />
                                 <button
                                   onClick={() => void agregarTarea(a.id)}
-                                  className="rounded-lg bg-azul p-1.5 text-white transition hover:brightness-110"
+                                  className="rounded-lg bg-rosa p-1.5 text-white transition hover:brightness-110"
                                   title="Agregar tarea"
                                 >
                                   <Plus size={12} />

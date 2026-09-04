@@ -26,20 +26,20 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           <nav className="flex items-center gap-1 text-sm">
             <Link
               href="/"
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold text-texto-2 transition hover:bg-panel-3 hover:text-texto"
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold text-texto-2 transition hover:bg-panel-3 hover:text-rosa"
             >
               <MapIcon size={14} /> Mapa
             </Link>
             <Link
               href="/personas"
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold text-texto-2 transition hover:bg-panel-3 hover:text-texto"
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold text-texto-2 transition hover:bg-panel-3 hover:text-rosa"
             >
               <Users size={14} /> Personas
             </Link>
             {perfil.rol === "superadmin" && (
               <Link
                 href="/usuarios"
-                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold text-texto-2 transition hover:bg-panel-3 hover:text-texto"
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold text-texto-2 transition hover:bg-panel-3 hover:text-rosa"
               >
                 <UserCog size={14} /> Usuarios
               </Link>

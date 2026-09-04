@@ -2,13 +2,18 @@
 
 /*
  * Sistema visual JxR — centro de comando territorial, modo oscuro.
- * Heredado del sistema CIMBA (paleta SMT):
- *   #0066FF azul (confianza) · #2EB1FF celeste · #F4DC00 amarillo (sol)
+ * Marca JxR: rosa #E14F82 + azul marino #14213D (isotipo "JxR").
+ * Herencia técnica de CIMBA para el mapa (avenidas, capas): azul/celeste/amarillo.
  * Capas territoriales sobre superficie #0B0F16:
- *   distritos violeta #A78BFA · circuitos verde #34D399 · foco amarillo.
+ *   distritos violeta #A78BFA · circuitos verde #34D399 · foco rosa (marca).
  */
 @theme {
-  /* Marca */
+  /* Marca JxR */
+  --color-rosa: #e14f82;
+  --color-rosa-2: #c93f6d;
+  --color-marino: #14213d;
+
+  /* Herencia técnica CIMBA (capas del mapa) */
   --color-azul: #0066ff;
   --color-celeste: #2eb1ff;
   --color-amarillo: #f4dc00;
