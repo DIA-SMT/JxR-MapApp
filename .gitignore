@@ -25,5 +25,4 @@ next-env.d.ts
 *.xls
 *.pdf
 *.csv
-padron*
 
