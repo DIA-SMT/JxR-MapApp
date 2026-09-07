@@ -1,6 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CODIGOS, esEspacioValido, etiquetaEspacio } from "./espacios";
+import { META_VOTOS, presetPeronismoDisperso } from "./estrategia";
+import type { Lista2023 } from "./padron";
 import type { Asignacion, Tarea, TipoEspacio } from "./tipos";
 
 /**
@@ -68,6 +70,100 @@ export const HERRAMIENTAS_MIGUE = [
       parameters: {
         type: "object",
         properties: { limite: { type: "number", description: "máx 20" } },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "estadisticas_padron",
+      description:
+        "Panorama del padrón electoral de la Capital: total de electores, por sexo, franjas etarias ESTIMADAS por rango de DNI, mesas y escuelas.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "padron_circuito",
+      description:
+        "Padrón de un circuito: electores, sexo, franjas etarias estimadas y sus escuelas de votación con cantidad de electores y mesas.",
+      parameters: {
+        type: "object",
+        properties: { codigo: { type: "string", description: "'15B', '7', '18G'…" } },
+        required: ["codigo"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "donde_vota",
+      description:
+        "LOGÍSTICA/SOPORTE: busca a una persona en el padrón por apellido/nombre o DNI y devuelve dónde vota (escuela, mesa, orden, circuito). Máx 8 resultados.",
+      parameters: {
+        type: "object",
+        properties: { texto: { type: "string", description: "Apellido, nombre o DNI" } },
+        required: ["texto"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ranking_circuitos_padron",
+      description: "Circuitos ordenados por cantidad de electores (dónde se concentra el padrón).",
+      parameters: {
+        type: "object",
+        properties: { limite: { type: "number", description: "máx 47" } },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "listas_2023",
+      description:
+        "Resultados 2023 (escrutinio definitivo, Capital): ranking de listas de una categoría con sus votos totales.",
+      parameters: {
+        type: "object",
+        properties: {
+          categoria: { type: "string", enum: ["CONCEJAL", "LEGISLADOR", "INTENDENTE", "GOBERNADOR"] },
+        },
+        required: ["categoria"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "votos_escuelas_2023",
+      description:
+        "Estrategia voto disperso: votos 2023 de un conjunto de listas agrupados por ESCUELA, con filtro de umbral (ej: escuelas donde el peronismo disperso sacó entre 150 y 300 votos). Si no se pasan listas usa la preselección de peronismo disperso sin banca.",
+      parameters: {
+        type: "object",
+        properties: {
+          categoria: { type: "string", enum: ["CONCEJAL", "LEGISLADOR", "INTENDENTE", "GOBERNADOR"] },
+          listas: { type: "array", items: { type: "number" }, description: "Números de lista; omitir para usar la preselección" },
+          min: { type: "number", description: "Votos mínimos por escuela (default 100)" },
+          max: { type: "number", description: "Votos máximos por escuela (opcional)" },
+          limite: { type: "number", description: "máx 30" },
+        },
+        required: ["categoria"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "estado_estrategia",
+      description:
+        "Avance del universo de la estrategia: cuántas escuelas están marcadas para trabajar y cuántos votos dispersos suman contra la meta de 20.000.",
+      parameters: {
+        type: "object",
+        properties: {
+          categoria: { type: "string", enum: ["CONCEJAL", "LEGISLADOR", "INTENDENTE", "GOBERNADOR"], description: "default CONCEJAL" },
+        },
       },
     },
   },
@@ -234,6 +330,82 @@ export async function ejecutarHerramientaMigue(
       }));
     }
 
+    case "estadisticas_padron": {
+      const { data, error } = await supabase.rpc("padron_resumen");
+      return error ? { error: error.message } : { ...data, nota: "franjas etarias ESTIMADAS por rango de DNI (aprox ±3 años)" };
+    }
+
+    case "padron_circuito": {
+      const codigo = String(args.codigo ?? "").toUpperCase().trim();
+      if (!esEspacioValido("circuito", codigo)) return { error: `no existe el circuito ${codigo}` };
+      const { data, error } = await supabase.rpc("padron_de_circuito", { p_circuito: codigo });
+      return error ? { error: error.message } : data;
+    }
+
+    case "donde_vota": {
+      const texto = typeof args.texto === "string" ? args.texto.trim().slice(0, 60) : "";
+      if (texto.length < 3) return { error: "escribí al menos 3 caracteres (apellido o DNI)" };
+      const { data, error } = await supabase.rpc("buscar_electores", { q: texto, p_circuito: null, p_limite: 8 });
+      if (error) return { error: error.message };
+      const filas = (data as Array<Record<string, unknown>>) ?? [];
+      return filas.length === 0
+        ? { resultado: "no aparece en el padrón de la Capital con ese texto" }
+        : filas.map((f) => ({
+            elector: f.apellido_nombre,
+            dni: f.dni,
+            circuito: f.circuito,
+            escuela: f.establecimiento,
+            mesa: f.mesa ?? "sin mesa asignada",
+            orden: f.orden_mesa,
+          }));
+    }
+
+    case "ranking_circuitos_padron": {
+      const { data, error } = await supabase.rpc("padron_por_circuito", { p_sexo: null, p_edad_min: null, p_edad_max: null });
+      if (error) return { error: error.message };
+      const filas = ((data as Array<{ circuito: string | null; total: number }>) ?? [])
+        .filter((f) => f.circuito)
+        .sort((a, b) => b.total - a.total)
+        .slice(0, lim(args.limite, 10, 47));
+      return filas.map((f, i) => ({ puesto: i + 1, circuito: f.circuito, electores: f.total }));
+    }
+
+    case "listas_2023": {
+      const { data, error } = await supabase.rpc("listas_2023", { p_categoria: String(args.categoria ?? "CONCEJAL") });
+      return error ? { error: error.message } : data;
+    }
+
+    case "votos_escuelas_2023": {
+      const categoria = String(args.categoria ?? "CONCEJAL");
+      let listas = Array.isArray(args.listas) ? (args.listas as number[]).filter(Number.isInteger) : [];
+      let notaPreset: string | null = null;
+      if (listas.length === 0) {
+        const { data: todas } = await supabase.rpc("listas_2023", { p_categoria: categoria });
+        listas = presetPeronismoDisperso((todas as Lista2023[]) ?? []);
+        notaPreset = `preselección peronismo disperso (${listas.length} listas, editable en Estrategia)`;
+      }
+      if (listas.length === 0) return { error: "no hay listas para analizar" };
+      const { data, error } = await supabase.rpc("votos_por_escuela_2023", { p_categoria: categoria, p_listas: listas });
+      if (error) return { error: error.message };
+      const min = Number.isFinite(Number(args.min)) ? Number(args.min) : 100;
+      const max = Number.isFinite(Number(args.max)) ? Number(args.max) : null;
+      const filas = ((data as Array<{ escuela: string; circuito: string | null; votos: number; mesas: number; electores: number }>) ?? [])
+        .filter((f) => f.votos >= min && (max == null || f.votos <= max))
+        .slice(0, lim(args.limite, 15, 30));
+      return { listas_analizadas: listas, ...(notaPreset ? { nota: notaPreset } : {}), umbral: { min, max }, escuelas: filas };
+    }
+
+    case "estado_estrategia": {
+      const categoria = String(args.categoria ?? "CONCEJAL");
+      const { data: todas } = await supabase.rpc("listas_2023", { p_categoria: categoria });
+      const listas = presetPeronismoDisperso((todas as Lista2023[]) ?? []);
+      if (listas.length === 0) return { error: "sin datos 2023 cargados" };
+      const { data, error } = await supabase.rpc("estrategia_resumen", { p_categoria: categoria, p_listas: listas, p_meta: META_VOTOS });
+      if (error) return { error: error.message };
+      const r = data as { meta: number; escuelas_incluidas: number; votos_incluidos: number };
+      return { ...r, avance_pct: r.meta > 0 ? Math.round((100 * r.votos_incluidos) / r.meta) : 0, nota: "votos según preselección peronismo disperso (categoría " + categoria + ")" };
+    }
+
     case "accionar_mapa": {
       const tipo = args.tipo as TipoEspacio;
       const codigo = String(args.codigo ?? "").toUpperCase().trim();
@@ -261,12 +433,21 @@ Contexto del territorio:
 - Cada asignación tiene un CHECKLIST de tareas que los administradores marcan como hechas.
 - Cobertura: un espacio está "sin asignar" (nadie a cargo), "en curso" (con gente asignada) o "completo" (checklist 100% hecho).
 
+Datos electorales que manejás:
+- PADRÓN de la Capital: ~459 mil electores con sexo, domicilio, circuito, escuela, mesa y orden. Las franjas etarias son ESTIMADAS por rango de DNI (±3 años): aclaralo cuando las uses. La herramienta donde_vota es para dar soporte logístico (decirle a alguien dónde vota).
+- RESULTADOS 2023 (escrutinio definitivo, mesa a mesa): votos por lista en GOBERNADOR, LEGISLADOR, INTENDENTE y CONCEJAL, cruzados con las escuelas del padrón.
+- ESTRATEGIA "voto disperso": identificar escuelas donde las listas peronistas chicas sin banca sumaron votos (típicamente ~100–300 por escuela) y marcar esas escuelas para trabajarlas con referentes, hasta construir un universo de ${META_VOTOS.toLocaleString("es-AR")} votos. La preselección de listas es editable en la pantalla Estrategia.
+
+Privacidad y límites (IMPORTANTES):
+- El padrón se usa para logística y soporte (dónde vota la gente, cuántos son, dónde se concentran). NUNCA especules ni permitas inferir la orientación política, religiosa o social de una persona individual: el voto es secreto y el análisis político es SIEMPRE agregado (por escuela, circuito o cohorte).
+- No inventes datos: si una herramienta no lo devuelve, no existe.
+
 Acción sobre el mapa:
 - Si el usuario pide VER algo ("mostrame el circuito 15B", "llevame al distrito 7", "dónde está el 18G"), usá accionar_mapa: el mapa lo selecciona y lo encuadra; si no estaba en el mapa, la app lo lleva sola.
 - Podés combinar: consultar datos (para responder con números) y además accionar_mapa (para que lo vea).
 
 Reglas:
 - SIEMPRE consultá las herramientas antes de dar números: nunca inventes datos ni respondas de memoria.
-- Si una pregunta no es sobre el operativo territorial (asignaciones, personas, tareas, distritos, circuitos), decí amablemente que solo manejás ese tema.
+- Si una pregunta no es sobre el operativo territorial (asignaciones, personas, tareas, distritos, circuitos, padrón, resultados 2023, estrategia), decí amablemente que solo manejás ese tema.
 - Tratá los datos de contacto con cuidado: compartilos solo cuando el administrador los pida explícitamente.
 - Formato: texto con guiones para listas y **negrita** para resaltar lo importante. Nada más de markdown (sin títulos #, sin tablas). Máximo ~150 palabras salvo que pidan detalle.`;

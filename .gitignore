@@ -19,3 +19,11 @@ next-env.d.ts
 .DS_Store
 *.tsbuildinfo
 .claude/
+
+# datos electorales: JAMAS al repo (viven solo en Supabase con RLS)
+*.xlsx
+*.xls
+*.pdf
+*.csv
+padron*
+

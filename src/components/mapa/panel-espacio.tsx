@@ -1,10 +1,18 @@
 "use client";
 
-import { Check, Plus, Square, Trash2, UserPlus, X } from "lucide-react";
+import { Check, Plus, School, Search, Square, Trash2, UserPlus, Vote, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { etiquetaEspacio } from "@/lib/espacios";
+import {
+  buscarElectores,
+  obtenerPadronDeCircuito,
+  type DetallePadronCircuito,
+  type ElectorEncontrado,
+} from "@/lib/padron";
 import type { ResumenEspacio, useTerritorio } from "@/lib/territorio";
 import type { SeleccionEspacio } from "./mapa-electoral";
+
+const numero = (n: number) => n.toLocaleString("es-AR");
 
 const CHIP_ESTADO = {
   sin: { texto: "Sin asignar", clase: "border-sin/40 bg-sin/10 text-sin" },
@@ -43,6 +51,31 @@ export function PanelEspacio({
   const [tareaNueva, setTareaNueva] = useState<Record<number, string>>({});
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Padrón del circuito seleccionado (agregados + búsqueda de electores)
+  const [padron, setPadron] = useState<DetallePadronCircuito | null>(null);
+  const [verEscuelas, setVerEscuelas] = useState(false);
+  const [qElector, setQElector] = useState("");
+  const [electores, setElectores] = useState<ElectorEncontrado[]>([]);
+  useEffect(() => {
+    setPadron(null);
+    setElectores([]);
+    setQElector("");
+    setVerEscuelas(false);
+    if (seleccion.tipo !== "circuito") return;
+    void obtenerPadronDeCircuito(supabase, seleccion.codigo).then(setPadron);
+  }, [supabase, seleccion.tipo, seleccion.codigo]);
+  useEffect(() => {
+    const texto = qElector.trim();
+    if (texto.length < 3 || seleccion.tipo !== "circuito") {
+      setElectores([]);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void buscarElectores(supabase, texto, seleccion.codigo, 6).then(setElectores);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [qElector, supabase, seleccion.tipo, seleccion.codigo]);
 
   const asignaciones = resumen?.asignaciones ?? [];
   const estado = resumen?.estado ?? "sin";
@@ -169,6 +202,69 @@ export function PanelEspacio({
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
+        {/* ── Padrón del circuito ── */}
+        {seleccion.tipo === "circuito" && padron && (
+          <div className="rounded-xl border border-borde bg-panel-2/70 p-3">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-texto-2 uppercase">
+              <Vote size={12} className="text-rosa" /> Padrón del circuito
+            </div>
+            <div className="num mt-1 text-lg font-extrabold">{numero(padron.total)} <span className="text-xs font-semibold text-texto-2">electores</span></div>
+            <div className="mt-0.5 text-[11px] text-texto-2">
+              {numero(padron.mujeres)} mujeres · {numero(padron.varones)} varones
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-1 text-[10px]">
+              <span className="rounded-full border border-borde-2 px-2 py-0.5" title="Franja estimada por rango de DNI">16–25: <b className="num">{numero(padron.franjas_estimadas.e16_25)}</b></span>
+              <span className="rounded-full border border-borde-2 px-2 py-0.5">26–40: <b className="num">{numero(padron.franjas_estimadas.e26_40)}</b></span>
+              <span className="rounded-full border border-borde-2 px-2 py-0.5">41–60: <b className="num">{numero(padron.franjas_estimadas.e41_60)}</b></span>
+              <span className="rounded-full border border-borde-2 px-2 py-0.5">60+: <b className="num">{numero(padron.franjas_estimadas.e60_mas)}</b></span>
+            </div>
+            <p className="mt-1 text-[9px] text-texto-3">Franjas etarias estimadas por rango de DNI (±3 años)</p>
+
+            <button
+              onClick={() => setVerEscuelas((v) => !v)}
+              className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-celeste hover:underline"
+            >
+              <School size={11} /> {padron.escuelas.length} escuelas de votación {verEscuelas ? "▴" : "▾"}
+            </button>
+            {verEscuelas && (
+              <div className="mt-1.5 max-h-40 space-y-1 overflow-y-auto">
+                {padron.escuelas.map((e) => (
+                  <div key={e.nombre} className="rounded-lg bg-panel px-2 py-1.5 text-[10px]">
+                    <div className="font-semibold">{e.nombre}</div>
+                    <div className="text-texto-3">
+                      {numero(e.electores)} electores{e.mesas ? ` · ${e.mesas} mesas` : ""}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Búsqueda de electores dentro del circuito (solo logística) */}
+            <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-borde-2 bg-panel px-2 py-1.5">
+              <Search size={11} className="shrink-0 text-texto-3" />
+              <input
+                value={qElector}
+                onChange={(e) => setQElector(e.target.value)}
+                placeholder="Buscar elector en este circuito…"
+                className="w-full bg-transparent text-[11px] outline-none placeholder:text-texto-3"
+              />
+            </div>
+            {electores.length > 0 && (
+              <div className="mt-1.5 space-y-1">
+                {electores.map((r) => (
+                  <div key={`${r.dni}-${r.mesa}`} className="rounded-lg bg-panel px-2 py-1.5 text-[10px]">
+                    <div className="font-semibold">{r.apellido_nombre} <span className="text-texto-3">· DNI {r.dni}</span></div>
+                    <div className="text-texto-3">
+                      {r.mesa ? `Mesa ${r.mesa}${r.orden_mesa ? ` · Orden ${r.orden_mesa}` : ""}` : "sin mesa asignada"}
+                      {r.establecimiento ? ` · ${r.establecimiento}` : ""}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {asignaciones.length === 0 && (
           <p className="px-1 text-xs text-texto-2">
             Nadie tiene asignado este espacio todavía. Asigná una persona abajo.

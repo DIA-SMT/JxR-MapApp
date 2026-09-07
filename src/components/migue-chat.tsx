@@ -36,10 +36,10 @@ function ConNegritas({ texto }: { texto: string }) {
 }
 
 const SUGERENCIAS = [
-  "¿Cómo viene la cobertura del operativo?",
-  "¿Qué circuitos no tienen a nadie asignado?",
-  "Mostrame el circuito 15B en el mapa",
-  "¿Qué tareas están pendientes?",
+  "¿Dónde vota Pérez Juan?",
+  "¿En qué escuelas el peronismo disperso sacó entre 150 y 300 votos?",
+  "¿Cuántos electores tiene el circuito 15B?",
+  "¿Cómo viene la estrategia contra la meta de 20.000?",
 ];
 
 /** Migue — el asistente del comando territorial — flotante en toda la app. */

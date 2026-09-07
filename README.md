@@ -55,8 +55,33 @@ npm run dev                   # http://localhost:3400
 - Clic en un espacio → panel de asignaciones y checklist.
 - `/?tipo=circuito&codigo=15B` selecciona y encuadra un espacio (lo usa Migue).
 
+## Padrón electoral y resultados 2023
+
+Los datos electorales viven **solo en Supabase con RLS** (jamás en el repo):
+
+```bash
+# 1) padrón (xlsx de la Junta Electoral): 459 mil electores → electores/escuelas/mesas
+node --max-old-space-size=6144 scripts/importar-padron.mjs "C:\ruta\padron.xlsx" [--reemplazar]
+# 2) escrutinio definitivo 2023 (PDF mesa a mesa) → resultados_2023 (valida el cruce mesa→escuela)
+node --max-old-space-size=6144 scripts/importar-resultados-2023.mjs "C:\ruta\mesa_a_mesa.pdf" [--reemplazar]
+# 3) coordenadas de las escuelas de votación (Nominatim/OSM, 1 req/seg)
+node scripts/geocodificar-escuelas.mjs
+```
+
+- **Vistas del mapa** (patrón CIMBA): Operativo · Padrón (coropleta/3D de
+  electores, filtrable por sexo y franja etaria *estimada por DNI*) ·
+  Escuelas (puntos + calor de concentración) · 2023 (voto disperso por circuito).
+- **¿Dónde vota?**: búsqueda por apellido/DNI con escuela, mesa y orden.
+- **Estrategia**: votos 2023 de listas seleccionadas agrupados por escuela,
+  umbral configurable (~200 votos por escuela) y universo acumulado hacia la
+  meta de 20.000. La selección de listas es del equipo (preselección editable).
+- El análisis político es **siempre agregado** (escuela/circuito/cohorte):
+  el voto es secreto y acá no se etiqueta a personas.
+
 ## Migue
 
 Asistente conversacional (OpenRouter, tool-calling de solo lectura con la
-sesión RLS del usuario): cobertura, personas, tareas pendientes y acción
-visual sobre el mapa ("mostrame el circuito 15B").
+sesión RLS del usuario): cobertura, personas, tareas, padrón ("¿dónde vota
+Pérez?", "¿cuántos electores tiene el 15B?"), resultados 2023 y estrategia
+("¿en qué escuelas el peronismo disperso sacó entre 150 y 300 votos?"),
+más acción visual sobre el mapa ("mostrame el circuito 15B").

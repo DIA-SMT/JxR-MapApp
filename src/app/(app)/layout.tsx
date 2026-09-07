@@ -1,4 +1,4 @@
-import { Map as MapIcon, Users, UserCog } from "lucide-react";
+import { Goal, Map as MapIcon, Users, UserCog } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BotonSalir } from "@/components/boton-salir";
@@ -35,6 +35,12 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
               className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold text-texto-2 transition hover:bg-panel-3 hover:text-rosa"
             >
               <Users size={14} /> Personas
+            </Link>
+            <Link
+              href="/estrategia"
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold text-texto-2 transition hover:bg-panel-3 hover:text-rosa"
+            >
+              <Goal size={14} /> Estrategia
             </Link>
             {perfil.rol === "superadmin" && (
               <Link
