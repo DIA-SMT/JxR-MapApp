@@ -122,6 +122,23 @@ export const HERRAMIENTAS_MIGUE = [
   {
     type: "function",
     function: {
+      name: "segmento_padron",
+      description:
+        "Microsegmentación: cuenta electores combinando sexo, franja etaria estimada y circuitos específicos. Ej: '¿cuántas mujeres de 16 a 25 hay en el 15B y el 20?'",
+      parameters: {
+        type: "object",
+        properties: {
+          sexo: { type: "string", enum: ["F", "M"] },
+          edad_min: { type: "number" },
+          edad_max: { type: "number" },
+          circuitos: { type: "array", items: { type: "string" }, description: "['15B','20']; omitir para toda la ciudad" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "listas_2023",
       description:
         "Resultados 2023 (escrutinio definitivo, Capital): ranking de listas de una categoría con sus votos totales.",
@@ -368,6 +385,22 @@ export async function ejecutarHerramientaMigue(
         .sort((a, b) => b.total - a.total)
         .slice(0, lim(args.limite, 10, 47));
       return filas.map((f, i) => ({ puesto: i + 1, circuito: f.circuito, electores: f.total }));
+    }
+
+    case "segmento_padron": {
+      const circuitosCrudos = Array.isArray(args.circuitos)
+        ? (args.circuitos as unknown[]).map((x) => String(x).toUpperCase().trim()).filter((x) => esEspacioValido("circuito", x))
+        : null;
+      const { data, error } = await supabase.rpc("padron_segmento", {
+        p_sexo: args.sexo === "F" || args.sexo === "M" ? args.sexo : null,
+        p_edad_min: Number.isFinite(Number(args.edad_min)) ? Number(args.edad_min) : null,
+        p_edad_max: Number.isFinite(Number(args.edad_max)) ? Number(args.edad_max) : null,
+        p_circuitos: circuitosCrudos && circuitosCrudos.length > 0 ? circuitosCrudos : null,
+        p_con_mesa: null,
+      });
+      if (error) return { error: error.message };
+      const r = data as { por_circuito: Array<{ circuito: string; total: number }> } & Record<string, unknown>;
+      return { ...r, por_circuito: (r.por_circuito ?? []).slice(0, 15), nota: "edades ESTIMADAS por rango de DNI (±3 años)" };
     }
 
     case "listas_2023": {

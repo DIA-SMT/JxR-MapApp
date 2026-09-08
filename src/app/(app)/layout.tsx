@@ -1,7 +1,8 @@
-import { Goal, Map as MapIcon, Users, UserCog } from "lucide-react";
+import { Goal, Map as MapIcon, SlidersHorizontal, Users, UserCog } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BotonSalir } from "@/components/boton-salir";
+import { BotonTema } from "@/components/boton-tema";
 import { LogoJxR } from "@/components/marca";
 import { MigueChat } from "@/components/migue-chat";
 import { sesionConPerfil } from "@/lib/supabase/servidor";
@@ -42,6 +43,12 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
             >
               <Goal size={14} /> Estrategia
             </Link>
+            <Link
+              href="/segmentos"
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold text-texto-2 transition hover:bg-panel-3 hover:text-rosa"
+            >
+              <SlidersHorizontal size={14} /> Segmentos
+            </Link>
             {perfil.rol === "superadmin" && (
               <Link
                 href="/usuarios"
@@ -59,6 +66,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
               {perfil.rol === "superadmin" ? "Superadmin" : "Admin"}
             </div>
           </div>
+          <BotonTema />
           <BotonSalir />
         </div>
       </header>

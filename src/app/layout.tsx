@@ -27,8 +27,16 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es-AR" className={`${poppins.variable} ${jbmono.variable}`}>
-      <body>{children}</body>
+    <html lang="es-AR" className={`${poppins.variable} ${jbmono.variable}`} suppressHydrationWarning>
+      <body>
+        {/* Tema antes del primer paint (evita el destello al recargar en claro) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem('jxr:tema')==='claro')document.documentElement.classList.add('claro')}catch(e){}`,
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

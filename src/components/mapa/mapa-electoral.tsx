@@ -2,7 +2,7 @@
 
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Box, Layers, Route, Satellite, Waypoints } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Layer,
   Map as MapaGL,
@@ -14,7 +14,7 @@ import {
   type MapRef,
 } from "react-map-gl/maplibre";
 import type { FeatureCollection, MultiPolygon, Point, Polygon } from "geojson";
-import type { FilterSpecification } from "maplibre-gl";
+import type { FilterSpecification, Map as MapaLibre } from "maplibre-gl";
 import { claveEspacio, useTerritorio } from "@/lib/territorio";
 import { etiquetaEspacio } from "@/lib/espacios";
 import {
@@ -29,35 +29,57 @@ import {
 } from "@/lib/padron";
 import { leerSeleccion, presetPeronismoDisperso } from "@/lib/estrategia";
 import type { TipoEspacio } from "@/lib/tipos";
-import { BuscadorElectores } from "./buscador-electores";
+import { BusquedaInteligente, type AccionInteligente } from "./busqueda-inteligente";
+import { PanelEscuela } from "./panel-escuela";
 import { PanelEspacio } from "./panel-espacio";
 
 /** Capas de territorio: polígonos de distritos y circuitos electorales. */
 type FCPoligono = FeatureCollection<Polygon | MultiPolygon, Record<string, unknown>>;
 type FCPuntos = FeatureCollection<Point, Record<string, unknown>>;
+type Tema = "oscuro" | "claro";
 
 const CENTRO_SMT: [number, number] = [-65.2226, -26.8241];
-const ESTILO_MAPA =
+const ESTILO_OSCURO =
   process.env.NEXT_PUBLIC_MAP_STYLE_DARK ??
   "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const ESTILO_CLARO =
+  process.env.NEXT_PUBLIC_MAP_STYLE_LIGHT ??
+  "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 
-const COLOR_TERRITORIO: Record<TipoEspacio, string> = {
-  distrito: "#a78bfa",
-  circuito: "#34d399",
-};
+/** Colores de las capas según el tema del mapa base. */
+const COLORES = {
+  oscuro: {
+    halo: "#05070c",
+    casing: "#05070c",
+    hover: "#edf2fa",
+    distrito: "#a78bfa",
+    circuito: "#34d399",
+    avenidaTexto: "#7cc4e8",
+    escuelaTexto: "#9fd3f5",
+    rampaPadron: ["#0e2a52", "#3987e5", "#cde2fb"] as [string, string, string],
+    rampa2023: ["#471527", "#e14f82", "#ffd6e4"] as [string, string, string],
+  },
+  claro: {
+    halo: "#ffffff",
+    casing: "#ffffff",
+    hover: "#14213d",
+    distrito: "#7c3aed",
+    circuito: "#047857",
+    avenidaTexto: "#0c6aa8",
+    escuelaTexto: "#0c6fb8",
+    rampaPadron: ["#e3edfb", "#3987e5", "#0e2a52"] as [string, string, string],
+    rampa2023: ["#fde7f0", "#e14f82", "#5c1129"] as [string, string, string],
+  },
+} as const;
 
 /**
  * Vistas del mapa comando (el patrón de CIMBA: cada vista prende solo las
- * capas que sirven para esa tarea):
- *  · Operativo — cobertura de asignaciones y checklist.
- *  · Padrón — densidad de electores por circuito (con microsegmentación).
- *  · Escuelas — establecimientos de votación y concentración de electorado.
- *  · 2023 — voto disperso del escrutinio 2023 por circuito (estrategia).
+ * capas que sirven para esa tarea).
  */
 const VISTAS = {
   operativo: { etiqueta: "Operativo", descripcion: "Cobertura del operativo: asignaciones y tareas" },
   padron: { etiqueta: "Padrón", descripcion: "Densidad de electores por circuito (filtrable por sexo y franja etaria estimada)" },
-  escuelas: { etiqueta: "Escuelas", descripcion: "Escuelas de votación: dónde se concentra el electorado" },
+  escuelas: { etiqueta: "Escuelas", descripcion: "Escuelas de votación: dónde se concentra el electorado (clic en una escuela = sus datos y resultados)" },
   v2023: { etiqueta: "2023", descripcion: "Voto disperso 2023 (Concejal) por circuito, según la selección de listas de Estrategia" },
 } as const;
 type Vista = keyof typeof VISTAS;
@@ -97,7 +119,7 @@ const capaAvenidas: LayerProps = {
     "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1.1, 14, 2.2, 17, 4],
   },
 };
-const capaAvenidasNombre: LayerProps = {
+const capaAvenidasNombre = (tema: Tema): LayerProps => ({
   id: "avenidas-nombre",
   type: "symbol",
   source: "carto",
@@ -113,12 +135,12 @@ const capaAvenidasNombre: LayerProps = {
     "text-max-angle": 35,
   },
   paint: {
-    "text-color": "#7cc4e8",
-    "text-opacity": 0.85,
-    "text-halo-color": "#070a10",
+    "text-color": COLORES[tema].avenidaTexto,
+    "text-opacity": 0.9,
+    "text-halo-color": COLORES[tema].halo,
     "text-halo-width": 1.8,
   },
-};
+});
 
 // ── Rellenos según vista ──────────────────────────────────────────────────────
 const COLOR_ESTADO = ["match", ["get", "estado"], "sin", "#ff3b30", "en_curso", "#f4dc00", "completo", "#199e70", "#6b7280"] as const;
@@ -135,7 +157,6 @@ const capaRellenoOperativo = (tipo: TipoEspacio, verCobertura: boolean): LayerPr
   },
 });
 
-/** Coropleta genérica (padrón/2023): rampa secuencial sobre fondo oscuro. */
 const capaCoropleta = (tipo: TipoEspacio, prop: string, max: number, colores: [string, string, string]): LayerProps => ({
   id: `${tipo}-relleno`,
   type: "fill",
@@ -168,7 +189,6 @@ const capa3DOperativo = (tipo: TipoEspacio): LayerProps => ({
   },
 });
 
-/** 3D de coropletas: la altura es la métrica (electores / votos dispersos). */
 const capa3DCoropleta = (tipo: TipoEspacio, prop: string, max: number, colores: [string, string, string]): LayerProps => ({
   id: `${tipo}-3d`,
   type: "fill-extrusion",
@@ -186,44 +206,44 @@ const capa3DCoropleta = (tipo: TipoEspacio, prop: string, max: number, colores: 
   },
 });
 
-// ── Límites BIEN marcados: brillo + casing oscuro + línea sólida ─────────────
-const capaGlow = (tipo: TipoEspacio, activa: boolean): LayerProps => ({
+// ── Límites BIEN marcados: brillo + casing + línea sólida ────────────────────
+const capaGlow = (tipo: TipoEspacio, activa: boolean, tema: Tema): LayerProps => ({
   id: `${tipo}-glow`,
   type: "line",
   source: tipo,
   layout: { "line-cap": "round", "line-join": "round" },
   paint: {
-    "line-color": COLOR_TERRITORIO[tipo],
-    "line-opacity": activa ? 0.38 : 0.14,
+    "line-color": COLORES[tema][tipo],
+    "line-opacity": (tema === "claro" ? 0.7 : 1) * (activa ? 0.38 : 0.14),
     "line-blur": 5,
     "line-width": ["interpolate", ["linear"], ["zoom"], 11, activa ? 7 : 4, 14, activa ? 12 : 6, 17, activa ? 18 : 9],
   },
 });
-const capaCasing = (tipo: TipoEspacio, activa: boolean): LayerProps => ({
+const capaCasing = (tipo: TipoEspacio, activa: boolean, tema: Tema): LayerProps => ({
   id: `${tipo}-casing`,
   type: "line",
   source: tipo,
   layout: { "line-cap": "round", "line-join": "round" },
   paint: {
-    "line-color": "#05070c",
+    "line-color": COLORES[tema].casing,
     "line-opacity": activa ? 0.9 : 0.55,
     "line-width": ["interpolate", ["linear"], ["zoom"], 11, activa ? 4 : 2.2, 14, activa ? 6.5 : 3.2, 17, activa ? 9 : 4.5],
   },
 });
-const capaLinea = (tipo: TipoEspacio, activa: boolean): LayerProps => ({
+const capaLinea = (tipo: TipoEspacio, activa: boolean, tema: Tema): LayerProps => ({
   id: `${tipo}-linea`,
   type: "line",
   source: tipo,
   layout: { "line-cap": "round", "line-join": "round" },
   paint: {
-    "line-color": COLOR_TERRITORIO[tipo],
+    "line-color": COLORES[tema][tipo],
     "line-opacity": activa ? 0.95 : 0.5,
     "line-width": ["interpolate", ["linear"], ["zoom"], 11, activa ? 1.8 : 1, 14, activa ? 3.2 : 1.6, 17, activa ? 5 : 2.4],
     ...(activa ? {} : { "line-dasharray": tipo === "distrito" ? [4, 2] : [1, 1.6] }),
   },
 });
 
-const capaNombre = (tipo: TipoEspacio, vista: Vista): LayerProps => {
+const capaNombre = (tipo: TipoEspacio, vista: Vista, tema: Tema): LayerProps => {
   let campo: unknown;
   if (tipo === "distrito") {
     campo = [
@@ -262,28 +282,28 @@ const capaNombre = (tipo: TipoEspacio, vista: Vista): LayerProps => {
       "text-letter-spacing": 0.03,
     },
     paint: {
-      "text-color": vista === "v2023" && tipo === "circuito" ? "#ffb3cd" : COLOR_TERRITORIO[tipo],
-      "text-halo-color": "#05070c",
+      "text-color": vista === "v2023" && tipo === "circuito" ? (tema === "claro" ? "#b3134f" : "#ffb3cd") : COLORES[tema][tipo],
+      "text-halo-color": COLORES[tema].halo,
       "text-halo-width": 2.2,
       "text-halo-blur": 0.5,
     },
   };
 };
 
-const capaHoverRelleno = (tipo: TipoEspacio, codigo: string): LayerProps => ({
+const capaHoverRelleno = (tipo: TipoEspacio, codigo: string, tema: Tema): LayerProps => ({
   id: `${tipo}-hover-relleno`,
   type: "fill",
   source: tipo,
   filter: ["==", ["get", "codigo"], codigo],
-  paint: { "fill-color": "#edf2fa", "fill-opacity": 0.09 },
+  paint: { "fill-color": COLORES[tema].hover, "fill-opacity": 0.09 },
 });
-const capaHoverLinea = (tipo: TipoEspacio, codigo: string): LayerProps => ({
+const capaHoverLinea = (tipo: TipoEspacio, codigo: string, tema: Tema): LayerProps => ({
   id: `${tipo}-hover-linea`,
   type: "line",
   source: tipo,
   filter: ["==", ["get", "codigo"], codigo],
   layout: { "line-cap": "round", "line-join": "round" },
-  paint: { "line-color": "#edf2fa", "line-width": 2.6, "line-opacity": 0.85 },
+  paint: { "line-color": COLORES[tema].hover, "line-width": 2.6, "line-opacity": 0.85 },
 });
 const capaSeleccionGlow = (tipo: TipoEspacio, codigo: string): LayerProps => ({
   id: `${tipo}-seleccion-glow`,
@@ -313,7 +333,7 @@ const capaEscuelasCalor: LayerProps = {
     "heatmap-opacity": 0.55,
     "heatmap-color": [
       "interpolate", ["linear"], ["heatmap-density"],
-      0, "rgba(61,21,39,0)",
+      0, "rgba(225,79,130,0)",
       0.3, "#7c2547",
       0.6, "#c93f6d",
       0.85, "#e14f82",
@@ -321,19 +341,19 @@ const capaEscuelasCalor: LayerProps = {
     ],
   },
 };
-const capaEscuelasPuntos: LayerProps = {
+const capaEscuelasPuntos = (tema: Tema): LayerProps => ({
   id: "escuelas-puntos",
   type: "circle",
   source: "escuelas",
   paint: {
-    "circle-color": "#2eb1ff",
+    "circle-color": tema === "claro" ? "#0c6fb8" : "#2eb1ff",
     "circle-opacity": 0.92,
     "circle-radius": ["interpolate", ["linear"], ["get", "electores"], 500, 4.5, 3000, 8, 6000, 12, 9500, 17],
     "circle-stroke-width": 1.5,
-    "circle-stroke-color": "#05070c",
+    "circle-stroke-color": COLORES[tema].halo,
   },
-};
-const capaEscuelasNombre: LayerProps = {
+});
+const capaEscuelasNombre = (tema: Tema): LayerProps => ({
   id: "escuelas-nombre",
   type: "symbol",
   source: "escuelas",
@@ -346,8 +366,22 @@ const capaEscuelasNombre: LayerProps = {
     "text-offset": [0, 1.2],
     "text-anchor": "top",
   },
-  paint: { "text-color": "#9fd3f5", "text-halo-color": "#05070c", "text-halo-width": 1.6 },
-};
+  paint: { "text-color": COLORES[tema].escuelaTexto, "text-halo-color": COLORES[tema].halo, "text-halo-width": 1.6 },
+});
+
+/** Prender/apagar el callejero del mapa base (teselas openmaptiles de carto). */
+function aplicarCalles(mapa: MapaLibre, visibles: boolean) {
+  try {
+    for (const capa of mapa.getStyle().layers ?? []) {
+      const sl = (capa as { "source-layer"?: string })["source-layer"];
+      if (sl === "transportation" && capa.type !== "symbol") {
+        mapa.setLayoutProperty(capa.id, "visibility", visibles ? "visible" : "none");
+      }
+    }
+  } catch {
+    // estilo a mitad de carga: el próximo idle lo vuelve a aplicar
+  }
+}
 
 /** bbox recursivo de una geometría GeoJSON (Polygon/MultiPolygon). */
 function bboxDeCoordenadas(c: unknown): [number, number, number, number] {
@@ -372,14 +406,22 @@ export interface SeleccionEspacio {
   codigo: string;
 }
 
-export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }) {
+export interface InicialMapa extends Partial<SeleccionEspacio> {
+  vista?: Vista;
+  sexo?: "F" | "M";
+  franja?: string;
+}
+
+export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
   const mapRef = useRef<MapRef>(null);
   const territorio = useTerritorio();
   const { supabase, asignaciones, tareas, porEspacio } = territorio;
 
+  const [tema, setTema] = useState<Tema>("oscuro");
   const [vista, setVista] = useState<Vista>("operativo");
   const [tipoActivo, setTipoActivo] = useState<TipoEspacio>("circuito");
   const [seleccion, setSeleccion] = useState<SeleccionEspacio | null>(null);
+  const [escuelaSel, setEscuelaSel] = useState<Escuela | null>(null);
   const [hover, setHover] = useState<{ codigo: string; x: number; y: number } | null>(null);
   const [hoverEscuela, setHoverEscuela] = useState<{ nombre: string; electores: number; mesas: number; circuito: string; x: number; y: number } | null>(null);
   const [verCobertura, setVerCobertura] = useState(true);
@@ -388,10 +430,14 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
   const [verAvenidas, setVerAvenidas] = useState(true);
   const [verCalles, setVerCalles] = useState(true);
   const [hayAnclaEtiquetas, setHayAnclaEtiquetas] = useState(true);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [usuarioId, setUsuarioId] = useState<string | null>(null);
 
   // Microsegmentación del padrón (vista Padrón)
   const [sexoFiltro, setSexoFiltro] = useState<"F" | "M" | null>(null);
   const [franjaClave, setFranjaClave] = useState("todas");
+  // Vista Escuelas: mínimo de electores (lo setea la búsqueda inteligente)
+  const [escuelasMin, setEscuelasMin] = useState(0);
 
   // Datos del padrón / escuelas / 2023
   const [resumen, setResumen] = useState<ResumenPadron | null>(null);
@@ -399,9 +445,25 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
   const [escuelas, setEscuelas] = useState<Escuela[]>([]);
   const [votos2023, setVotos2023] = useState<Map<string, number> | null>(null);
 
+  const avisoTimer = useRef<number | null>(null);
+  const avisar = useCallback((texto: string) => {
+    if (avisoTimer.current) window.clearTimeout(avisoTimer.current);
+    setAviso(texto);
+    avisoTimer.current = window.setTimeout(() => setAviso(null), 4000);
+  }, []);
+
+  // Tema del mapa: sigue el toggle global (clase .claro en <html>)
+  useEffect(() => {
+    const leer = () => setTema(document.documentElement.classList.contains("claro") ? "claro" : "oscuro");
+    leer();
+    window.addEventListener("jxr:tema", leer);
+    return () => window.removeEventListener("jxr:tema", leer);
+  }, []);
+
   useEffect(() => {
     void obtenerResumenPadron(supabase).then(setResumen);
     void obtenerEscuelas(supabase).then(setEscuelas);
+    void supabase.auth.getUser().then(({ data }) => setUsuarioId(data.user?.id ?? null));
   }, [supabase]);
 
   useEffect(() => {
@@ -415,7 +477,7 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
     });
   }, [supabase, sexoFiltro, franjaClave]);
 
-  // Voto disperso 2023 (Concejal): usa la selección guardada en Estrategia o el preset
+  // Voto disperso 2023 (Concejal): selección de Estrategia o preset
   useEffect(() => {
     if (vista !== "v2023" || votos2023 !== null) return;
     void (async () => {
@@ -429,9 +491,10 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
     })();
   }, [vista, votos2023, supabase]);
 
-  // Las vistas de datos electorales trabajan por circuito (el padrón es por circuito)
+  // Las vistas de datos electorales trabajan por circuito
   useEffect(() => {
     if (vista !== "operativo" && tipoActivo !== "circuito") setTipoActivo("circuito");
+    if (vista !== "escuelas") setEscuelaSel(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vista]);
 
@@ -481,14 +544,14 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
     () => ({
       type: "FeatureCollection",
       features: escuelas
-        .filter((e) => e.lat != null && e.lon != null)
+        .filter((e) => e.lat != null && e.lon != null && e.electores >= escuelasMin)
         .map((e) => ({
           type: "Feature",
           geometry: { type: "Point", coordinates: [e.lon as number, e.lat as number] },
           properties: { nombre: e.nombre, electores: e.electores, mesas: e.mesas ?? 0, circuito: e.circuito ?? "" },
         })),
     }),
-    [escuelas],
+    [escuelas, escuelasMin],
   );
 
   const volarAEspacio = (tipo: TipoEspacio, codigo: string) => {
@@ -511,11 +574,36 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
   const volarRef = useRef(volarAEspacio);
   volarRef.current = volarAEspacio;
 
-  const seleccionarCircuito = (codigo: string) => {
+  const seleccionarCircuito = useCallback((codigo: string) => {
+    setEscuelaSel(null);
     setTipoActivo("circuito");
     setSeleccion({ tipo: "circuito", codigo });
     volarRef.current("circuito", codigo);
-  };
+  }, []);
+
+  /** Acciones de la búsqueda inteligente (texto/voz → mapa). */
+  const ejecutarAccion = useCallback((a: AccionInteligente) => {
+    switch (a.accion) {
+      case "ir_espacio":
+        setEscuelaSel(null);
+        setTipoActivo(a.tipo);
+        setSeleccion({ tipo: a.tipo, codigo: a.codigo });
+        volarRef.current(a.tipo, a.codigo);
+        break;
+      case "vista":
+        setVista(a.vista);
+        break;
+      case "filtros_padron":
+        setVista("padron");
+        if (a.sexo) setSexoFiltro(a.sexo === "todos" ? null : a.sexo);
+        if (a.franja) setFranjaClave(a.franja);
+        break;
+      case "escuelas_min":
+        setVista("escuelas");
+        setEscuelasMin(a.minimo);
+        break;
+    }
+  }, []);
 
   const alternar3D = () => {
     const mapa = mapRef.current?.getMap();
@@ -526,27 +614,32 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
     });
   };
 
-  // Calles del mapa base (teselas carto): prender/apagar
+  // Calles del mapa base: aplicar al cargar, al alternar y tras cambiar de tema
+  const verCallesRef = useRef(verCalles);
+  verCallesRef.current = verCalles;
   useEffect(() => {
     const mapa = mapRef.current?.getMap();
-    if (!mapa || !mapa.isStyleLoaded()) return;
-    try {
-      for (const capa of mapa.getStyle().layers ?? []) {
-        const sl = (capa as { "source-layer"?: string })["source-layer"];
-        if (sl === "transportation" && capa.type !== "symbol") {
-          mapa.setLayoutProperty(capa.id, "visibility", verCalles ? "visible" : "none");
-        }
-      }
-    } catch {
-      // el estilo puede no estar listo: el toggle vuelve a intentar en el próximo cambio
-    }
+    if (mapa) aplicarCalles(mapa, verCalles);
   }, [verCalles]);
+  useEffect(() => {
+    const mapa = mapRef.current?.getMap();
+    if (!mapa) return;
+    const alIdle = () => {
+      setHayAnclaEtiquetas(!!mapa.getLayer("roadname_minor"));
+      aplicarCalles(mapa, verCallesRef.current);
+    };
+    mapa.once("idle", alIdle);
+    return () => {
+      mapa.off("idle", alIdle);
+    };
+  }, [tema]);
 
   // Migue (u otro link) acciona el mapa
   useEffect(() => {
     const alAccionar = (e: Event) => {
       const d = (e as CustomEvent<SeleccionEspacio>).detail;
       if (!d?.tipo || !d?.codigo) return;
+      setEscuelaSel(null);
       setTipoActivo(d.tipo);
       setSeleccion(d);
       volarRef.current(d.tipo, d.codigo);
@@ -555,28 +648,43 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
     return () => window.removeEventListener("jxr:accionar-mapa", alAccionar);
   }, []);
 
-  // Selección inicial por URL (?tipo=&codigo=)
+  // Estado inicial por URL (?tipo=&codigo=&vista=&sexo=&franja=)
   const inicialHechoRef = useRef(false);
   useEffect(() => {
     if (!inicial || inicialHechoRef.current || !distritosGeo || !circuitosGeo) return;
     inicialHechoRef.current = true;
-    setTipoActivo(inicial.tipo);
-    setSeleccion(inicial);
-    volarRef.current(inicial.tipo, inicial.codigo);
+    if (inicial.vista) setVista(inicial.vista);
+    if (inicial.sexo) setSexoFiltro(inicial.sexo);
+    if (inicial.franja) setFranjaClave(inicial.franja);
+    if (inicial.tipo && inicial.codigo) {
+      setTipoActivo(inicial.tipo);
+      setSeleccion({ tipo: inicial.tipo, codigo: inicial.codigo });
+      volarRef.current(inicial.tipo, inicial.codigo);
+    }
   }, [inicial, distritosGeo, circuitosGeo]);
 
   const alClick = (e: MapLayerMouseEvent) => {
     const f = e.features?.[0];
     if (!f) {
       setSeleccion(null);
+      setEscuelaSel(null);
       return;
     }
     if (f.layer.id === "escuelas-puntos") {
-      const circ = String(f.properties.circuito ?? "");
-      if (circ) seleccionarCircuito(circ);
+      const nombre = String(f.properties.nombre ?? "");
+      const esc = escuelas.find((x) => x.nombre === nombre);
+      if (esc) {
+        setSeleccion(null);
+        setEscuelaSel(esc);
+        const mapa = mapRef.current?.getMap();
+        if (esc.lon != null && esc.lat != null) {
+          mapa?.easeTo({ center: [esc.lon - 0.004, esc.lat], zoom: Math.max(mapa.getZoom(), 14), duration: 800 });
+        }
+      }
       return;
     }
     const codigo = String(f.properties.codigo);
+    setEscuelaSel(null);
     setSeleccion({ tipo: tipoActivo, codigo });
     volarRef.current(tipoActivo, codigo);
   };
@@ -623,6 +731,7 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
   const resumenHover = hover ? porEspacio.get(claveEspacio(tipoActivo, hover.codigo)) : null;
   const resumenSeleccion = seleccion ? porEspacio.get(claveEspacio(seleccion.tipo, seleccion.codigo)) : null;
   const tipoContexto: TipoEspacio = tipoActivo === "distrito" ? "circuito" : "distrito";
+  const c = COLORES[tema];
 
   const capasInteractivas =
     vista === "escuelas"
@@ -634,7 +743,7 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
       <MapaGL
         ref={mapRef}
         initialViewState={{ longitude: CENTRO_SMT[0], latitude: CENTRO_SMT[1], zoom: 12.1 }}
-        mapStyle={ESTILO_MAPA}
+        mapStyle={tema === "claro" ? ESTILO_CLARO : ESTILO_OSCURO}
         attributionControl={{ compact: true }}
         interactiveLayerIds={capasInteractivas}
         cursor={hover || hoverEscuela ? "pointer" : "grab"}
@@ -644,7 +753,10 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
           setHover(null);
           setHoverEscuela(null);
         }}
-        onLoad={(e) => setHayAnclaEtiquetas(e.target.getLayer("roadname_minor") != null)}
+        onLoad={(e) => {
+          setHayAnclaEtiquetas(e.target.getLayer("roadname_minor") != null);
+          aplicarCalles(e.target, verCallesRef.current);
+        }}
       >
         <NavigationControl position="bottom-right" visualizePitch />
         <ScaleControl position="bottom-left" />
@@ -665,7 +777,7 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
           <>
             <Layer {...capaAvenidasBrillo} />
             <Layer {...capaAvenidas} />
-            <Layer {...capaAvenidasNombre} />
+            <Layer {...capaAvenidasNombre(tema)} />
           </>
         )}
 
@@ -676,28 +788,28 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
           const activa = tipo === tipoActivo;
           const relleno =
             vista === "padron"
-              ? capaCoropleta(tipo, "electores", maxElectores, ["#0e2a52", "#3987e5", "#cde2fb"])
+              ? capaCoropleta(tipo, "electores", maxElectores, c.rampaPadron)
               : vista === "v2023"
-                ? capaCoropleta(tipo, "votos2023", maxVotos2023, ["#471527", "#e14f82", "#ffd6e4"])
+                ? capaCoropleta(tipo, "votos2023", maxVotos2023, c.rampa2023)
                 : capaRellenoOperativo(tipo, vista === "escuelas" ? false : verCobertura);
           const tresD =
             vista === "padron"
-              ? capa3DCoropleta(tipo, "electores", maxElectores, ["#0e2a52", "#3987e5", "#cde2fb"])
+              ? capa3DCoropleta(tipo, "electores", maxElectores, c.rampaPadron)
               : vista === "v2023"
-                ? capa3DCoropleta(tipo, "votos2023", maxVotos2023, ["#471527", "#e14f82", "#ffd6e4"])
+                ? capa3DCoropleta(tipo, "votos2023", maxVotos2023, c.rampa2023)
                 : capa3DOperativo(tipo);
           return (
             <Source key={tipo} id={tipo} type="geojson" data={geo}>
               {activa && !ver3D && <Layer {...relleno} />}
               {activa && ver3D && <Layer {...tresD} />}
-              <Layer {...capaGlow(tipo, activa)} />
-              <Layer {...capaCasing(tipo, activa)} />
-              <Layer {...capaLinea(tipo, activa)} />
-              {activa && hover && <Layer {...capaHoverRelleno(tipo, hover.codigo)} />}
-              {activa && hover && <Layer {...capaHoverLinea(tipo, hover.codigo)} />}
+              <Layer {...capaGlow(tipo, activa, tema)} />
+              <Layer {...capaCasing(tipo, activa, tema)} />
+              <Layer {...capaLinea(tipo, activa, tema)} />
+              {activa && hover && <Layer {...capaHoverRelleno(tipo, hover.codigo, tema)} />}
+              {activa && hover && <Layer {...capaHoverLinea(tipo, hover.codigo, tema)} />}
               {seleccion?.tipo === tipo && <Layer {...capaSeleccionGlow(tipo, seleccion.codigo)} />}
               {seleccion?.tipo === tipo && <Layer {...capaSeleccion(tipo, seleccion.codigo)} />}
-              {activa && <Layer {...capaNombre(tipo, vista)} />}
+              {activa && <Layer {...capaNombre(tipo, vista, tema)} />}
             </Source>
           );
         })}
@@ -705,15 +817,14 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
         {vista === "escuelas" && escuelasGeo.features.length > 0 && (
           <Source id="escuelas" type="geojson" data={escuelasGeo}>
             <Layer {...capaEscuelasCalor} />
-            <Layer {...capaEscuelasPuntos} />
-            <Layer {...capaEscuelasNombre} />
+            <Layer {...capaEscuelasPuntos(tema)} />
+            <Layer {...capaEscuelasNombre(tema)} />
           </Source>
         )}
       </MapaGL>
 
       {/* ── Barra superior ── */}
       <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-24px)] flex-wrap items-center gap-2">
-        {/* Vistas (patrón CIMBA) */}
         <div className="panel-vidrio pointer-events-auto flex overflow-hidden rounded-xl text-xs font-bold">
           {(Object.keys(VISTAS) as Vista[]).map((v) => (
             <button
@@ -797,7 +908,7 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
           </button>
         </div>
 
-        <BuscadorElectores supabase={supabase} onIrACircuito={seleccionarCircuito} />
+        <BusquedaInteligente supabase={supabase} onAccion={ejecutarAccion} onAviso={avisar} />
       </div>
 
       {/* ── Segunda fila: KPIs + microsegmentación ── */}
@@ -855,7 +966,25 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
             </select>
           </div>
         )}
+
+        {vista === "escuelas" && escuelasMin > 0 && (
+          <div className="panel-vidrio pointer-events-auto flex items-center gap-2 rounded-xl px-3 py-1.5 text-[11px]">
+            <span>
+              Escuelas con ≥ <b className="num">{numero(escuelasMin)}</b> electores
+            </span>
+            <button onClick={() => setEscuelasMin(0)} className="font-bold text-rosa hover:underline">
+              quitar filtro
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* ── Aviso de la búsqueda/acciones ── */}
+      {aviso && (
+        <div className="panel-vidrio pointer-events-none absolute top-3 left-1/2 z-30 -translate-x-1/2 rounded-xl border-rosa/40 px-4 py-2 text-xs font-bold text-rosa">
+          {aviso}
+        </div>
+      )}
 
       {/* ── Leyenda ── */}
       <div className="panel-vidrio absolute bottom-8 left-3 z-10 max-w-64 rounded-xl px-3 py-2.5 text-[10px] leading-relaxed">
@@ -870,7 +999,7 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
         {vista === "padron" && (
           <>
             <div className="mb-1 font-bold tracking-wide text-texto-2 uppercase">Electores por circuito</div>
-            <div className="h-2 w-full rounded-sm" style={{ background: "linear-gradient(90deg,#0e2a52,#3987e5,#cde2fb)" }} />
+            <div className="h-2 w-full rounded-sm" style={{ background: `linear-gradient(90deg,${c.rampaPadron[0]},${c.rampaPadron[1]},${c.rampaPadron[2]})` }} />
             <div className="flex justify-between text-texto-3"><span>0</span><span>{numero(maxElectores)}</span></div>
             <div className="mt-1 text-texto-3">Franjas etarias estimadas por DNI (±3 años)</div>
           </>
@@ -878,7 +1007,7 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
         {vista === "v2023" && (
           <>
             <div className="mb-1 font-bold tracking-wide text-texto-2 uppercase">Voto disperso 2023 · Concejal</div>
-            <div className="h-2 w-full rounded-sm" style={{ background: "linear-gradient(90deg,#471527,#e14f82,#ffd6e4)" }} />
+            <div className="h-2 w-full rounded-sm" style={{ background: `linear-gradient(90deg,${c.rampa2023[0]},${c.rampa2023[1]},${c.rampa2023[2]})` }} />
             <div className="flex justify-between text-texto-3"><span>0</span><span>{numero(maxVotos2023)}</span></div>
             <div className="mt-1 text-texto-3">Listas según la selección de Estrategia</div>
           </>
@@ -887,12 +1016,13 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
           <>
             <div className="mb-1 font-bold tracking-wide text-texto-2 uppercase">Escuelas de votación</div>
             <div className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full border border-fondo bg-celeste" /> Tamaño = electores que votan ahí</div>
-            <div className="flex items-center gap-1.5"><span className="inline-block h-2 w-4 rounded-sm" style={{ background: "linear-gradient(90deg,rgba(61,21,39,0),#e14f82)" }} /> Calor = concentración</div>
+            <div className="flex items-center gap-1.5"><span className="inline-block h-2 w-4 rounded-sm" style={{ background: "linear-gradient(90deg,rgba(225,79,130,0),#e14f82)" }} /> Calor = concentración</div>
+            <div className="mt-1 text-texto-3">Clic en una escuela: padrón + resultados 2023</div>
           </>
         )}
         <div className="mt-1.5 border-t border-borde pt-1.5">
-          <div className="flex items-center gap-1.5"><span className="inline-block w-4" style={{ borderTop: "3px solid #a78bfa" }} /> Distritos</div>
-          <div className="flex items-center gap-1.5"><span className="inline-block w-4" style={{ borderTop: "3px solid #34d399" }} /> Circuitos</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block w-4" style={{ borderTop: `3px solid ${c.distrito}` }} /> Distritos</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block w-4" style={{ borderTop: `3px solid ${c.circuito}` }} /> Circuitos</div>
         </div>
         {ver3D && (
           <div className="mt-1.5 border-t border-borde pt-1.5 text-texto-3">
@@ -927,11 +1057,21 @@ export function MapaElectoral({ inicial }: { inicial?: SeleccionEspacio | null }
           <div className="text-texto-2">
             {numero(hoverEscuela.electores)} electores · {hoverEscuela.mesas} mesas · Circuito {hoverEscuela.circuito}
           </div>
+          <div className="text-[10px] text-rosa">Clic: padrón + resultados 2023 de la escuela</div>
         </div>
       )}
 
-      {/* ── Panel del espacio seleccionado ── */}
-      {seleccion && (
+      {/* ── Paneles laterales ── */}
+      {escuelaSel && (
+        <PanelEscuela
+          supabase={supabase}
+          escuela={escuelaSel}
+          usuarioId={usuarioId}
+          onVerCircuito={seleccionarCircuito}
+          onCerrar={() => setEscuelaSel(null)}
+        />
+      )}
+      {seleccion && !escuelaSel && (
         <PanelEspacio
           seleccion={seleccion}
           resumen={resumenSeleccion ?? null}

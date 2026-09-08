@@ -155,3 +155,87 @@ export async function obtenerVotosPorCircuito2023(
   const { data } = await supabase.rpc("votos_por_circuito_2023", { p_categoria: categoria, p_listas: listas });
   return (data as Array<{ circuito: string; votos: number }>) ?? [];
 }
+
+/** Ranking de listas 2023 de UNA escuela (popup interactivo del mapa). */
+export async function obtenerVotosDeEscuela2023(
+  supabase: SupabaseClient,
+  escuela: string,
+  categoria = "CONCEJAL",
+): Promise<Lista2023[]> {
+  const { data } = await supabase.rpc("votos_de_escuela_2023", { p_escuela: escuela, p_categoria: categoria });
+  return ((data as Array<{ lista_numero: number; lista_nombre: string; votos: number }>) ?? []).map((f) => ({
+    ...f,
+    mesas: 0,
+  }));
+}
+
+export interface Resumen2023Circuito {
+  circuito: string;
+  categoria: string;
+  votos_total: number;
+  positivos: number;
+  blanco: number;
+  nulos: number;
+  padron_actual: number;
+  participacion_pct: number | null;
+  top_listas: Array<{ numero: number; nombre: string; votos: number }>;
+}
+
+export async function obtenerResumen2023Circuito(
+  supabase: SupabaseClient,
+  circuito: string,
+  categoria = "CONCEJAL",
+): Promise<Resumen2023Circuito | null> {
+  const { data } = await supabase.rpc("resumen_2023_circuito", { p_circuito: circuito, p_categoria: categoria });
+  return (data as Resumen2023Circuito) ?? null;
+}
+
+// ── Segmentos (microsegmentación del padrón) ─────────────────────────────────
+
+export interface FiltrosSegmento {
+  sexo?: "F" | "M" | null;
+  edad_min?: number | null;
+  edad_max?: number | null;
+  franja_clave?: string | null;
+  circuitos?: string[] | null;
+  con_mesa?: boolean | null;
+}
+
+export interface ResultadoSegmento {
+  total: number;
+  mujeres: number;
+  varones: number;
+  con_mesa: number;
+  franjas_estimadas: { e16_25: number; e26_40: number; e41_60: number; e60_mas: number };
+  por_circuito: Array<{ circuito: string; total: number }>;
+}
+
+export interface Segmento {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+  filtros: FiltrosSegmento;
+  creado_en: string;
+}
+
+export async function calcularSegmento(
+  supabase: SupabaseClient,
+  filtros: FiltrosSegmento,
+): Promise<ResultadoSegmento | null> {
+  const { data } = await supabase.rpc("padron_segmento", {
+    p_sexo: filtros.sexo ?? null,
+    p_edad_min: filtros.edad_min ?? null,
+    p_edad_max: filtros.edad_max ?? null,
+    p_circuitos: filtros.circuitos && filtros.circuitos.length > 0 ? filtros.circuitos : null,
+    p_con_mesa: filtros.con_mesa ?? null,
+  });
+  return (data as ResultadoSegmento) ?? null;
+}
+
+export async function listarSegmentos(supabase: SupabaseClient): Promise<Segmento[]> {
+  const { data } = await supabase
+    .from("segmentos")
+    .select("id, nombre, descripcion, filtros, creado_en")
+    .order("creado_en", { ascending: false });
+  return (data as Segmento[]) ?? [];
+}

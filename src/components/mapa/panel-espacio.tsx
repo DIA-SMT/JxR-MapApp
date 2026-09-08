@@ -6,8 +6,10 @@ import { etiquetaEspacio } from "@/lib/espacios";
 import {
   buscarElectores,
   obtenerPadronDeCircuito,
+  obtenerResumen2023Circuito,
   type DetallePadronCircuito,
   type ElectorEncontrado,
+  type Resumen2023Circuito,
 } from "@/lib/padron";
 import type { ResumenEspacio, useTerritorio } from "@/lib/territorio";
 import type { SeleccionEspacio } from "./mapa-electoral";
@@ -57,13 +59,18 @@ export function PanelEspacio({
   const [verEscuelas, setVerEscuelas] = useState(false);
   const [qElector, setQElector] = useState("");
   const [electores, setElectores] = useState<ElectorEncontrado[]>([]);
+  const [r2023, setR2023] = useState<Resumen2023Circuito | null>(null);
+  const [ver2023, setVer2023] = useState(false);
   useEffect(() => {
     setPadron(null);
     setElectores([]);
     setQElector("");
     setVerEscuelas(false);
+    setR2023(null);
+    setVer2023(false);
     if (seleccion.tipo !== "circuito") return;
     void obtenerPadronDeCircuito(supabase, seleccion.codigo).then(setPadron);
+    void obtenerResumen2023Circuito(supabase, seleccion.codigo, "CONCEJAL").then(setR2023);
   }, [supabase, seleccion.tipo, seleccion.codigo]);
   useEffect(() => {
     const texto = qElector.trim();
@@ -260,6 +267,55 @@ export function PanelEspacio({
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Resultados 2023 del circuito ── */}
+        {seleccion.tipo === "circuito" && r2023 && r2023.votos_total > 0 && (
+          <div className="rounded-xl border border-borde bg-panel-2/70 p-3">
+            <button
+              onClick={() => setVer2023((v) => !v)}
+              className="flex w-full items-center justify-between text-[11px] font-bold tracking-wide text-texto-2 uppercase"
+            >
+              <span>Resultados 2023 · Concejal</span>
+              <span>{ver2023 ? "▴" : "▾"}</span>
+            </button>
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[11px]">
+              <span>
+                <b className="num text-texto">{numero(r2023.votos_total)}</b>{" "}
+                <span className="text-texto-3">votos</span>
+              </span>
+              {r2023.participacion_pct != null && (
+                <span title="Votos 2023 sobre el padrón actual del circuito (aproximado: el padrón creció)">
+                  <b className="num text-rosa">{r2023.participacion_pct}%</b>{" "}
+                  <span className="text-texto-3">del padrón actual</span>
+                </span>
+              )}
+              <span className="text-texto-3">
+                blanco <b className="num text-texto-2">{numero(r2023.blanco)}</b> · nulos{" "}
+                <b className="num text-texto-2">{numero(r2023.nulos)}</b>
+              </span>
+            </div>
+            {ver2023 && (
+              <div className="mt-2 space-y-1.5">
+                {r2023.top_listas.map((l) => {
+                  const max = Math.max(1, r2023.top_listas[0]?.votos ?? 1);
+                  return (
+                    <div key={l.numero} className="text-[10px]">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 flex-1 truncate text-texto-2" title={l.nombre}>
+                          {l.numero} · {l.nombre}
+                        </span>
+                        <span className="num shrink-0 font-bold">{numero(l.votos)}</span>
+                      </div>
+                      <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-panel-3">
+                        <div className="h-full rounded-full bg-celeste/70" style={{ width: `${Math.max(2, (100 * l.votos) / max)}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
