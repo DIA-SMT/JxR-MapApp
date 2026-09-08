@@ -448,18 +448,61 @@ const capaPrioridadPuntos: LayerProps = {
   },
 };
 
-/** Prender/apagar el callejero del mapa base (teselas openmaptiles de carto). */
-function aplicarCalles(mapa: MapaLibre, visibles: boolean) {
+/**
+ * Callejero legible (el realce de CIMBA): dark-matter es deliberadamente
+ * minimalista — rellena las calles menores recién en zoom 15, esconde sus
+ * nombres hasta zoom 16 y pinta las de servicio casi negras. Acá se adelantan
+ * esos zooms y se sube el contraste sobre las capas ya presentes del estilo.
+ * El toggle «Calles» controla los NOMBRES; las trazas quedan siempre realzadas.
+ */
+const CALLES_NOMBRES = {
+  oscuro: [
+    { id: "roadname_minor", minzoom: 14.5, size: 10.5, color: "#b9c6d8" },
+    { id: "roadname_sec", minzoom: 13.5, size: 11, color: "#c8d4e4" },
+    { id: "roadname_pri", minzoom: 12.5, size: 11.5, color: "#d6e0ee" },
+    { id: "roadname_major", minzoom: 11.5, size: 12, color: "#e2eaf5" },
+  ],
+  claro: [
+    { id: "roadname_minor", minzoom: 14.5, size: 10.5, color: "#5b6b7d" },
+    { id: "roadname_sec", minzoom: 13.5, size: 11, color: "#4d5c6e" },
+    { id: "roadname_pri", minzoom: 12.5, size: 11.5, color: "#41505f" },
+    { id: "roadname_major", minzoom: 11.5, size: 12, color: "#36434f" },
+  ],
+} as const;
+const CALLES_TRAZAS = [
+  { id: "road_minor_fill", minzoom: 13.5, color: "rgba(88, 97, 118, 1)" },
+  { id: "road_minor_case", minzoom: 12.5, color: "rgba(72, 79, 98, 1)" },
+  { id: "road_service_fill", minzoom: 14.5, color: "rgba(70, 76, 94, 1)" },
+  { id: "road_sec_fill_noramp", minzoom: 12, color: "rgba(96, 105, 126, 1)" },
+] as const;
+
+function aplicarCalles(mapa: MapaLibre, visibles: boolean, tema: Tema): boolean {
+  let capas = 0;
   try {
-    for (const capa of mapa.getStyle().layers ?? []) {
-      const sl = (capa as { "source-layer"?: string })["source-layer"];
-      if (sl === "transportation" && capa.type !== "symbol") {
-        mapa.setLayoutProperty(capa.id, "visibility", visibles ? "visible" : "none");
-      }
-    }
+    capas = mapa.getStyle()?.layers?.length ?? 0;
   } catch {
-    // estilo a mitad de carga: el próximo idle lo vuelve a aplicar
+    capas = 0;
   }
+  if (capas === 0) return false;
+
+  for (const c of CALLES_NOMBRES[tema]) {
+    if (!mapa.getLayer(c.id)) continue;
+    mapa.setLayoutProperty(c.id, "visibility", visibles ? "visible" : "none");
+    if (!visibles) continue;
+    mapa.setLayerZoomRange(c.id, c.minzoom, 24);
+    mapa.setLayoutProperty(c.id, "text-size", c.size);
+    mapa.setPaintProperty(c.id, "text-color", c.color);
+    mapa.setPaintProperty(c.id, "text-halo-color", tema === "oscuro" ? "#070a10" : "#ffffff");
+    mapa.setPaintProperty(c.id, "text-halo-width", 1.7);
+  }
+  // Las trazas se realzan siempre (solo aclaramos colores en oscuro: positron
+  // ya trae calles legibles y pisarlas con estos grises las volvería barro)
+  for (const c of CALLES_TRAZAS) {
+    if (!mapa.getLayer(c.id)) continue;
+    mapa.setLayerZoomRange(c.id, c.minzoom, 24);
+    if (tema === "oscuro") mapa.setPaintProperty(c.id, "line-color", c.color);
+  }
+  return true;
 }
 
 /** bbox recursivo de una geometría GeoJSON (Polygon/MultiPolygon). */
@@ -736,6 +779,8 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
   }, []);
 
   /** Acciones de la búsqueda inteligente (texto/voz → mapa). */
+  const escuelasRef = useRef(escuelas);
+  escuelasRef.current = escuelas;
   const ejecutarAccion = useCallback((a: AccionInteligente) => {
     switch (a.accion) {
       case "ir_espacio":
@@ -756,6 +801,18 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
         setVista("escuelas");
         setEscuelasMin(a.minimo);
         break;
+      case "escuela": {
+        const esc = escuelasRef.current.find((x) => x.nombre === a.nombre);
+        if (!esc) break;
+        setVista((v) => (v === "escuelas" || v === "prioridad" ? v : "escuelas"));
+        setSeleccion(null);
+        setEscuelaSel(esc);
+        const mapa = mapRef.current?.getMap();
+        if (mapa && esc.lon != null && esc.lat != null) {
+          mapa.easeTo({ center: [esc.lon - 0.004, esc.lat], zoom: Math.max(mapa.getZoom(), 14), duration: 800 });
+        }
+        break;
+      }
     }
   }, []);
 
@@ -768,26 +825,34 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
     });
   };
 
-  // Calles del mapa base: aplicar al cargar, al alternar y tras cambiar de tema
-  const verCallesRef = useRef(verCalles);
-  verCallesRef.current = verCalles;
+  // Realce del callejero: se aplica al cargar, al alternar el toggle y en cada
+  // styledata — el cambio de tema dispara un setStyle que borra los ajustes, y
+  // sin el listener el realce moriría tras el primer cambio de estilo.
+  // aplicarCalles es idempotente, así que no hay bucle.
   useEffect(() => {
-    const mapa = mapRef.current?.getMap();
-    if (mapa) aplicarCalles(mapa, verCalles);
-  }, [verCalles]);
-  useEffect(() => {
-    const mapa = mapRef.current?.getMap();
-    if (!mapa) return;
-    const alIdle = () => {
-      setHayAnclaEtiquetas(!!mapa.getLayer("roadname_minor"));
-      aplicarCalles(mapa, verCallesRef.current);
-      asegurarIconoEscuela(mapa);
+    let cancelado = false;
+    const aplicar = () => {
+      const mapa = mapRef.current?.getMap();
+      if (!mapa) return false;
+      const ok = aplicarCalles(mapa, verCalles, tema);
+      if (ok) {
+        setHayAnclaEtiquetas(!!mapa.getLayer("roadname_minor"));
+        asegurarIconoEscuela(mapa);
+      }
+      return ok;
     };
-    mapa.once("idle", alIdle);
+    aplicar();
+    const id = window.setInterval(() => {
+      if (cancelado || aplicar()) window.clearInterval(id);
+    }, 300);
+    const mapa = mapRef.current?.getMap();
+    mapa?.on("styledata", aplicar);
     return () => {
-      mapa.off("idle", alIdle);
+      cancelado = true;
+      window.clearInterval(id);
+      mapa?.off("styledata", aplicar);
     };
-  }, [tema]);
+  }, [verCalles, tema]);
 
   // Migue (u otro link) acciona el mapa
   useEffect(() => {
@@ -928,7 +993,6 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
         }}
         onLoad={(e) => {
           setHayAnclaEtiquetas(e.target.getLayer("roadname_minor") != null);
-          aplicarCalles(e.target, verCallesRef.current);
           asegurarIconoEscuela(e.target);
         }}
       >
@@ -1078,7 +1142,7 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
           </button>
           <button
             onClick={() => setVerCalles((v) => !v)}
-            title="Mostrar u ocultar el callejero del mapa base"
+            title="Nombres de todas las calles al acercar el zoom (las trazas quedan siempre realzadas)"
             className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold transition ${
               verCalles ? "bg-panel-3 text-texto" : "text-texto-3 hover:text-texto"
             }`}
@@ -1096,7 +1160,7 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
           </button>
         </div>
 
-        <BusquedaInteligente supabase={supabase} onAccion={ejecutarAccion} onAviso={avisar} />
+        <BusquedaInteligente supabase={supabase} escuelas={escuelas} onAccion={ejecutarAccion} onAviso={avisar} />
       </div>
 
       {/* ── Segunda fila: KPIs + microsegmentación ── */}
@@ -1256,14 +1320,29 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
           style={{ left: hover.x + 14, top: hover.y + 10 }}
         >
           <div className="font-bold">{etiquetaEspacio(tipoActivo, hover.codigo)}</div>
-          <div className="text-texto-2">
-            {vista === "padron" && `${numero(padronCirc.get(hover.codigo) ?? 0)} electores (filtro activo)`}
-            {vista === "v2023" && `${numero(votos2023?.get(hover.codigo) ?? 0)} votos dispersos 2023`}
-            {vista === "prioridad" && `${numero(huerfanosCirc.get(hover.codigo) ?? 0)} votos huérfanos (sin referente)`}
-            {(vista === "operativo" || vista === "escuelas") &&
-              (resumenHover
+          {/* Ficha completa al pasar: todo lo ya cargado, no solo lo de la vista */}
+          <div className="space-y-0.5 text-texto-2">
+            {tipoActivo === "circuito" && padronCirc.has(hover.codigo) && (
+              <div>
+                <b className="num text-texto">{numero(padronCirc.get(hover.codigo) ?? 0)}</b> electores
+                {sexoFiltro || franjaClave !== "todas" ? " (filtro activo)" : ""}
+              </div>
+            )}
+            {tipoActivo === "circuito" && votos2023?.has(hover.codigo) && (
+              <div>
+                <b className="num text-rosa">{numero(votos2023.get(hover.codigo) ?? 0)}</b> votos dispersos 2023
+              </div>
+            )}
+            {tipoActivo === "circuito" && prioridad !== null && (huerfanosCirc.get(hover.codigo) ?? 0) > 0 && (
+              <div>
+                <b className="num text-sin">{numero(huerfanosCirc.get(hover.codigo) ?? 0)}</b> huérfanos (sin referente)
+              </div>
+            )}
+            <div>
+              {resumenHover
                 ? `${resumenHover.asignaciones.length} persona${resumenHover.asignaciones.length === 1 ? "" : "s"} · tareas ${resumenHover.nHechas}/${resumenHover.tareas.length}`
-                : "Sin asignar — clic para asignar")}
+                : "Sin asignar — clic para asignar"}
+            </div>
           </div>
         </div>
       )}

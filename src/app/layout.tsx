@@ -14,9 +14,28 @@ const jbmono = JetBrains_Mono({
   variable: "--font-jbmono",
 });
 
+const DESCRIPCION =
+  "El mapa electoral de San Miguel de Tucumán: padrón, resultados 2023, estrategia y operativo territorial en un solo comando.";
+
 export const metadata: Metadata = {
-  title: "JxR · Comando Territorial",
-  description: "Asignación de distritos y circuitos electorales — San Miguel de Tucumán",
+  // Base para que los og:image/íconos salgan con URL absoluta en los previews
+  metadataBase: new URL("https://jxr-mapapp.vercel.app"),
+  title: { default: "JxR · Comando Territorial", template: "%s · JxR Comando Territorial" },
+  description: DESCRIPCION,
+  applicationName: "JxR Comando Territorial",
+  openGraph: {
+    type: "website",
+    locale: "es_AR",
+    url: "/",
+    siteName: "JxR Comando Territorial",
+    title: "JxR · Comando Territorial",
+    description: DESCRIPCION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "JxR · Comando Territorial",
+    description: DESCRIPCION,
+  },
 };
 
 export const viewport: Viewport = {

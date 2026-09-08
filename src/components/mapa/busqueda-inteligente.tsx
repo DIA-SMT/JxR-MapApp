@@ -1,9 +1,9 @@
 "use client";
 
 import { IdCard, MapPin, Mic, Search, Sparkles, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { esEspacioValido } from "@/lib/espacios";
-import { buscarElectores, type ElectorEncontrado } from "@/lib/padron";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CODIGOS, esEspacioValido, etiquetaEspacio } from "@/lib/espacios";
+import { buscarElectores, type ElectorEncontrado, type Escuela } from "@/lib/padron";
 import type { TipoEspacio } from "@/lib/tipos";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -12,7 +12,14 @@ export type AccionInteligente =
   | { accion: "ir_espacio"; tipo: TipoEspacio; codigo: string }
   | { accion: "vista"; vista: "operativo" | "padron" | "escuelas" | "v2023" | "prioridad" }
   | { accion: "filtros_padron"; sexo?: "F" | "M" | "todos"; franja?: string }
-  | { accion: "escuelas_min"; minimo: number };
+  | { accion: "escuelas_min"; minimo: number }
+  | { accion: "escuela"; nombre: string };
+
+const normalizar = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
 
 interface ReconocedorVoz {
   lang: string;
@@ -33,10 +40,12 @@ interface ReconocedorVoz {
  */
 export function BusquedaInteligente({
   supabase,
+  escuelas,
   onAccion,
   onAviso,
 }: {
   supabase: SupabaseClient;
+  escuelas: Escuela[];
   onAccion: (a: AccionInteligente) => void;
   onAviso: (texto: string) => void;
 }) {
@@ -202,6 +211,51 @@ export function BusquedaInteligente({
     if (e.circuito) onAccion({ accion: "ir_espacio", tipo: "circuito", codigo: e.circuito });
   };
 
+  // ── Sugerencias instantáneas (sin red): espacios y escuelas ──
+  // "15" → Circuito 15/15A/15B… + Distrito 15; "circuito 18" acota el tipo
+  const sugEspacios = useMemo(() => {
+    const m = q.trim().match(/^(?:(distrito|circuito)s?\s+)?(\d{1,2}\s?[a-gA-G]?)$/i);
+    if (!m || interpretando) return [];
+    const parcial = m[2].toUpperCase().replace(/\s+/g, "");
+    const tipoPedido = m[1]?.toLowerCase() as TipoEspacio | undefined;
+    const filas: Array<{ tipo: TipoEspacio; codigo: string }> = [];
+    for (const tipo of ["circuito", "distrito"] as const) {
+      if (tipoPedido && tipo !== tipoPedido) continue;
+      for (const codigo of CODIGOS[tipo]) {
+        if (codigo.startsWith(parcial)) filas.push({ tipo, codigo });
+      }
+    }
+    return filas.slice(0, 8);
+  }, [q, interpretando]);
+
+  // Escuelas por nombre (todas las palabras deben aparecer, sin acentos)
+  const sugEscuelas = useMemo(() => {
+    const texto = normalizar(q.trim());
+    if (texto.length < 3 || /^\d+$/.test(texto) || interpretando) return [];
+    const tokens = texto.split(/\s+/);
+    return escuelas.filter((e) => {
+      const n = normalizar(e.nombre);
+      return tokens.every((t) => n.includes(t));
+    }).slice(0, 5);
+  }, [q, escuelas, interpretando]);
+
+  const elegirEspacio = (s: { tipo: TipoEspacio; codigo: string }) => {
+    setAbierto(false);
+    setElegido(null);
+    setQ("");
+    onAccion({ accion: "ir_espacio", tipo: s.tipo, codigo: s.codigo });
+    onAviso(etiquetaEspacio(s.tipo, s.codigo));
+  };
+  const elegirEscuela = (e: Escuela) => {
+    setAbierto(false);
+    setElegido(null);
+    setQ("");
+    onAccion({ accion: "escuela", nombre: e.nombre });
+    if (e.lat == null) onAviso("Escuela sin ubicación en el mapa: igual se abre su ficha");
+  };
+
+  const hayPanel = !elegido && (sugEspacios.length > 0 || sugEscuelas.length > 0 || (abierto && resultados.length > 0));
+
   return (
     <div className="pointer-events-auto relative">
       <div className="panel-vidrio flex items-center gap-1.5 rounded-xl px-2.5 py-1.5">
@@ -234,22 +288,70 @@ export function BusquedaInteligente({
         )}
       </div>
 
-      {abierto && (
-        <div className="panel-vidrio absolute top-full left-0 z-30 mt-1 max-h-80 w-[360px] overflow-y-auto rounded-xl p-1.5">
-          {resultados.map((r) => (
-            <button
-              key={`${r.dni}-${r.mesa}`}
-              onClick={() => elegir(r)}
-              className="block w-full rounded-lg px-2 py-1.5 text-left transition hover:bg-panel-3"
-            >
-              <div className="text-[12px] font-bold">{r.apellido_nombre}</div>
-              <div className="text-[10px] text-texto-3">
-                DNI {r.dni} · Circuito {r.circuito ?? "?"} ·{" "}
-                {r.mesa ? `Mesa ${r.mesa}${r.orden_mesa ? ` · Orden ${r.orden_mesa}` : ""}` : "sin mesa asignada"}
+      {hayPanel && (
+        <div className="panel-vidrio absolute top-full left-0 z-30 mt-1 max-h-96 w-[360px] overflow-y-auto rounded-xl p-1.5">
+          {sugEspacios.length > 0 && (
+            <div className="flex flex-wrap gap-1 p-1">
+              {sugEspacios.map((s) => (
+                <button
+                  key={`${s.tipo}-${s.codigo}`}
+                  onClick={() => elegirEspacio(s)}
+                  className={`rounded-lg border px-2 py-1 text-[11px] font-bold transition ${
+                    s.tipo === "distrito"
+                      ? "border-distrito/50 text-distrito hover:bg-distrito/10"
+                      : "border-circuito/50 text-circuito hover:bg-circuito/10"
+                  }`}
+                >
+                  {etiquetaEspacio(s.tipo, s.codigo)}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {sugEscuelas.length > 0 && (
+            <>
+              <div className="px-2 pt-1.5 pb-0.5 text-[9px] font-bold tracking-wide text-texto-3 uppercase">
+                Escuelas de votación
               </div>
-              {r.establecimiento && <div className="text-[10px] text-celeste">{r.establecimiento}</div>}
-            </button>
-          ))}
+              {sugEscuelas.map((e) => (
+                <button
+                  key={e.id}
+                  onClick={() => elegirEscuela(e)}
+                  className="block w-full rounded-lg px-2 py-1.5 text-left transition hover:bg-panel-3"
+                >
+                  <div className="text-[12px] font-bold">🏫 {e.nombre}</div>
+                  <div className="text-[10px] text-texto-3">
+                    {e.electores.toLocaleString("es-AR")} electores · {e.mesas ?? 0} mesas · Circuito {e.circuito ?? "?"}
+                    {e.lat == null ? " · sin ubicación en el mapa" : ""}
+                  </div>
+                </button>
+              ))}
+            </>
+          )}
+
+          {abierto && resultados.length > 0 && (
+            <>
+              {(sugEspacios.length > 0 || sugEscuelas.length > 0) && (
+                <div className="px-2 pt-1.5 pb-0.5 text-[9px] font-bold tracking-wide text-texto-3 uppercase">
+                  Padrón
+                </div>
+              )}
+              {resultados.map((r) => (
+                <button
+                  key={`${r.dni}-${r.mesa}`}
+                  onClick={() => elegir(r)}
+                  className="block w-full rounded-lg px-2 py-1.5 text-left transition hover:bg-panel-3"
+                >
+                  <div className="text-[12px] font-bold">{r.apellido_nombre}</div>
+                  <div className="text-[10px] text-texto-3">
+                    DNI {r.dni} · Circuito {r.circuito ?? "?"} ·{" "}
+                    {r.mesa ? `Mesa ${r.mesa}${r.orden_mesa ? ` · Orden ${r.orden_mesa}` : ""}` : "sin mesa asignada"}
+                  </div>
+                  {r.establecimiento && <div className="text-[10px] text-celeste">{r.establecimiento}</div>}
+                </button>
+              ))}
+            </>
+          )}
         </div>
       )}
 

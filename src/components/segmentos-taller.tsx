@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Map as MapIcon, Save, SlidersHorizontal, Trash2, Users } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Map as MapIcon, Save, SlidersHorizontal, Trash2, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CIRCUITOS } from "@/lib/espacios";
+import { descargarCSV } from "@/lib/csv";
 import {
   calcularSegmento,
   FRANJAS,
@@ -271,13 +272,34 @@ export function SegmentosTaller() {
                   </div>
                 )}
               </div>
-              <Link
-                href={linkMapa}
-                className="flex items-center gap-1.5 rounded-xl border border-rosa/40 px-3 py-2 text-xs font-bold text-rosa transition hover:border-rosa"
-                title="Abrir la vista Padrón del mapa con sexo y franja aplicados (los circuitos se ven en la tabla)"
-              >
-                <MapIcon size={13} /> Ver en el mapa
-              </Link>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (!resultado) return;
+                    const desc = [
+                      sexo === "F" ? "mujeres" : sexo === "M" ? "varones" : "todos",
+                      franjaClave !== "todas" ? franjaClave.replace("_", "-") : null,
+                    ].filter(Boolean).join("-");
+                    descargarCSV(
+                      `segmento-${desc}`,
+                      ["Circuito", "Electores del segmento"],
+                      resultado.por_circuito.map((f) => [f.circuito, f.total]),
+                    );
+                  }}
+                  disabled={!resultado || resultado.por_circuito.length === 0}
+                  title="Descargar la distribución por circuito como CSV"
+                  className="flex items-center gap-1.5 rounded-xl border border-borde-2 px-3 py-2 text-xs font-bold text-texto-2 transition hover:border-rosa/50 hover:text-rosa disabled:opacity-40"
+                >
+                  <Download size={13} /> CSV
+                </button>
+                <Link
+                  href={linkMapa}
+                  className="flex items-center gap-1.5 rounded-xl border border-rosa/40 px-3 py-2 text-xs font-bold text-rosa transition hover:border-rosa"
+                  title="Abrir la vista Padrón del mapa con sexo y franja aplicados (los circuitos se ven en la tabla)"
+                >
+                  <MapIcon size={13} /> Ver en el mapa
+                </Link>
+              </div>
             </div>
             {resultado && (
               <div className="mt-3 flex flex-wrap gap-1.5 text-[10px]">

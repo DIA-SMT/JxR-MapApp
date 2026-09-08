@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   Crosshair,
+  Download,
   Goal,
   ListFilter,
   MapPin,
@@ -24,6 +25,7 @@ import {
   type VotosEscuela2023,
 } from "@/lib/padron";
 import { guardarSeleccionDB, META_VOTOS, presetPeronismoDisperso, resolverSeleccion } from "@/lib/estrategia";
+import { descargarCSV } from "@/lib/csv";
 import { crearClienteNavegador } from "@/lib/supabase/cliente";
 
 const numero = (n: number) => n.toLocaleString("es-AR");
@@ -232,6 +234,34 @@ export function Estrategia2023() {
             ))}
           </select>
         )}
+        <button
+          onClick={() => {
+            if (tab === "frontera") {
+              descargarCSV(
+                "frontera-20k",
+                ["Tier", "Escuela", "Circuito", "Votos dispersos", "Positivos", "% disperso", "Electores", "Mesas 2023", "Referentes", "Tareas hechas", "Tareas total", "Score", "Acumulado", "En frontera", "Marcada"],
+                frontera.map((f) => [
+                  f.tier, f.escuela, f.circuito, f.votos_dispersos, f.positivos, f.pct_disperso,
+                  f.electores, f.mesas, f.referentes, f.tareas_hechas, f.tareas_total,
+                  f.score, f.acumulado, f.en_frontera, f.incluida,
+                ]),
+              );
+            } else {
+              descargarCSV(
+                `voto-disperso-${categoria.toLowerCase()}`,
+                ["Escuela", "Circuito", "Votos dispersos", "Mesas 2023", "Electores actuales", "Mesa 2023 sin escuela", "Marcada"],
+                filtradas.map((e) => [
+                  e.escuela, e.circuito, e.votos, e.mesas, e.electores,
+                  esMesaSinEscuela(e.escuela), incluidas.get(e.escuela) ?? false,
+                ]),
+              );
+            }
+          }}
+          title="Descargar la tabla visible como CSV (Excel/Sheets) para seguir procesándola"
+          className="ml-auto flex items-center gap-1.5 rounded-xl border border-borde-2 px-3 py-1.5 text-xs font-bold text-texto-2 transition hover:border-rosa/50 hover:text-rosa"
+        >
+          <Download size={13} /> Exportar CSV
+        </button>
       </div>
 
       {/* Meta (siempre Concejal, solo escuelas reales) */}
