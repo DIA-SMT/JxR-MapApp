@@ -30,7 +30,7 @@ const HERRAMIENTA = {
         tipo: { type: "string", enum: ["distrito", "circuito"] },
         codigo: { type: "string", description: "'15B', '7', '18G'… para ir_espacio" },
         texto: { type: "string", description: "Apellido/nombre o DNI para donde_vota" },
-        vista: { type: "string", enum: ["operativo", "padron", "escuelas", "v2023"] },
+        vista: { type: "string", enum: ["operativo", "padron", "escuelas", "v2023", "prioridad"] },
         sexo: { type: "string", enum: ["F", "M", "todos"], description: "para filtros_padron" },
         franja: {
           type: "string",
@@ -52,6 +52,7 @@ Contexto:
 - "mostrame el 15B", "andá al circuito 20", "llevame al 18 G" → ir_espacio (codigo en mayúsculas, sin espacios: "18G").
 - "dónde vota Pérez Juan", "buscá el DNI 30123456" → donde_vota.
 - "mostrá el padrón", "vista escuelas", "cómo dio el 2023", "voto disperso" → vista.
+- "dónde actuamos primero", "prioridad", "frontera", "votos huérfanos" → vista prioridad.
 - "mujeres de 16 a 25", "varones mayores de 60", "jóvenes en el padrón" → filtros_padron (16-25→16_25, 26-40→26_40, 41-60→41_60, 60+→60_mas).
 - "escuelas con más de 5000 electores", "las escuelas más grandes" (usar 4000) → escuelas_min.
 - Si la frase no encaja en nada de esto → accion "nada".`;

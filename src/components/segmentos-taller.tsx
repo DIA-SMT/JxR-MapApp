@@ -34,6 +34,7 @@ export function SegmentosTaller() {
   const [guardados, setGuardados] = useState<Segmento[]>([]);
   const [nombre, setNombre] = useState("");
   const timer = useRef<number | null>(null);
+  const reqRef = useRef(0); // vigencia: una respuesta lenta vieja no pisa filtros nuevos
 
   useEffect(() => {
     void supabase.auth.getUser().then(({ data }) => setUsuarioId(data.user?.id ?? null));
@@ -57,10 +58,12 @@ export function SegmentosTaller() {
     if (timer.current) window.clearTimeout(timer.current);
     setCalculando(true);
     timer.current = window.setTimeout(async () => {
+      const req = ++reqRef.current;
       try {
-        setResultado(await calcularSegmento(supabase, filtros));
+        const r = await calcularSegmento(supabase, filtros);
+        if (reqRef.current === req) setResultado(r);
       } finally {
-        setCalculando(false);
+        if (reqRef.current === req) setCalculando(false);
       }
     }, 400);
     return () => {

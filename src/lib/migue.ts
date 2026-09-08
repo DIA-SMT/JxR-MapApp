@@ -1,8 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CODIGOS, esEspacioValido, etiquetaEspacio } from "./espacios";
-import { META_VOTOS, presetPeronismoDisperso } from "./estrategia";
-import type { Lista2023 } from "./padron";
+import { META_VOTOS, resolverSeleccion } from "./estrategia";
 import type { Asignacion, Tarea, TipoEspacio } from "./tipos";
 
 /**
@@ -173,6 +172,21 @@ export const HERRAMIENTAS_MIGUE = [
   {
     type: "function",
     function: {
+      name: "frontera_20k",
+      description:
+        "Frontera 20K: ranking de prioridad territorial escuela por escuela (score = volumen de voto disperso + propensión + descubierto de cobertura), el conjunto mínimo de escuelas que suma la meta, y los votos huérfanos (dispersos sin referente). Usala para '¿dónde actuamos primero?'",
+      parameters: {
+        type: "object",
+        properties: {
+          categoria: { type: "string", enum: ["CONCEJAL", "LEGISLADOR", "INTENDENTE", "GOBERNADOR"], description: "default CONCEJAL" },
+          limite: { type: "number", description: "escuelas del top a mostrar, máx 25" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "estado_estrategia",
       description:
         "Avance del universo de la estrategia: cuántas escuelas están marcadas para trabajar y cuántos votos dispersos suman contra la meta de 20.000.",
@@ -259,12 +273,14 @@ export async function ejecutarHerramientaMigue(
     case "buscar_persona": {
       const texto = typeof args.texto === "string" ? args.texto.trim().slice(0, 60) : "";
       if (!texto) return { error: "texto vacío" };
-      const patron = `%${texto}%`;
-      const { data: personas } = await supabase
+      // PostgREST usa comas/paréntesis como sintaxis del filtro: sanear antes de interpolar
+      const patron = `%${texto.replace(/[,()"\\]/g, " ").trim()}%`;
+      const { data: personas, error: errorBusqueda } = await supabase
         .from("personas")
         .select("id, nombre, documento, direccion, telefono, email, notas")
         .or(`nombre.ilike.${patron},documento.ilike.${patron},telefono.ilike.${patron},email.ilike.${patron}`)
         .limit(8);
+      if (errorBusqueda) return { error: `la búsqueda falló: ${errorBusqueda.message}` };
       if (!personas || personas.length === 0) return { resultado: "ninguna persona coincide" };
       const { asignaciones, tareas } = await cargarOperativo(supabase);
       const avance = avancePorAsignacion(tareas);
@@ -388,19 +404,32 @@ export async function ejecutarHerramientaMigue(
     }
 
     case "segmento_padron": {
-      const circuitosCrudos = Array.isArray(args.circuitos)
-        ? (args.circuitos as unknown[]).map((x) => String(x).toUpperCase().trim()).filter((x) => esEspacioValido("circuito", x))
-        : null;
+      let circuitosPedidos: string[] | null = null;
+      if (Array.isArray(args.circuitos)) {
+        const crudos = (args.circuitos as unknown[]).map((x) => String(x).toUpperCase().trim()).filter(Boolean);
+        const invalidos = crudos.filter((x) => !esEspacioValido("circuito", x));
+        // JAMÁS degradar en silencio a "toda la ciudad": si pidieron circuitos
+        // y alguno no existe, se corta acá con el detalle.
+        if (invalidos.length > 0) {
+          return { error: `circuitos inexistentes: ${invalidos.join(", ")} (válidos: 1–22 con letras, ej 15B)` };
+        }
+        if (crudos.length > 0) circuitosPedidos = crudos;
+      }
       const { data, error } = await supabase.rpc("padron_segmento", {
         p_sexo: args.sexo === "F" || args.sexo === "M" ? args.sexo : null,
         p_edad_min: Number.isFinite(Number(args.edad_min)) ? Number(args.edad_min) : null,
         p_edad_max: Number.isFinite(Number(args.edad_max)) ? Number(args.edad_max) : null,
-        p_circuitos: circuitosCrudos && circuitosCrudos.length > 0 ? circuitosCrudos : null,
+        p_circuitos: circuitosPedidos,
         p_con_mesa: null,
       });
       if (error) return { error: error.message };
       const r = data as { por_circuito: Array<{ circuito: string; total: number }> } & Record<string, unknown>;
-      return { ...r, por_circuito: (r.por_circuito ?? []).slice(0, 15), nota: "edades ESTIMADAS por rango de DNI (±3 años)" };
+      return {
+        ...r,
+        por_circuito: (r.por_circuito ?? []).slice(0, 15),
+        circuitos_consultados: circuitosPedidos ?? "toda la ciudad",
+        nota: "edades ESTIMADAS por rango de DNI (±3 años)",
+      };
     }
 
     case "listas_2023": {
@@ -410,33 +439,79 @@ export async function ejecutarHerramientaMigue(
 
     case "votos_escuelas_2023": {
       const categoria = String(args.categoria ?? "CONCEJAL");
-      let listas = Array.isArray(args.listas) ? (args.listas as number[]).filter(Number.isInteger) : [];
-      let notaPreset: string | null = null;
+      // coerción explícita: los tool-calls suelen mandar números como strings
+      let listas = Array.isArray(args.listas)
+        ? (args.listas as unknown[]).map(Number).filter(Number.isInteger)
+        : [];
+      let notaSeleccion: string | null = null;
       if (listas.length === 0) {
-        const { data: todas } = await supabase.rpc("listas_2023", { p_categoria: categoria });
-        listas = presetPeronismoDisperso((todas as Lista2023[]) ?? []);
-        notaPreset = `preselección peronismo disperso (${listas.length} listas, editable en Estrategia)`;
+        listas = await resolverSeleccion(supabase, categoria);
+        notaSeleccion = `selección de listas del equipo (${listas.length} listas, la misma que muestra la pantalla Estrategia)`;
       }
       if (listas.length === 0) return { error: "no hay listas para analizar" };
       const { data, error } = await supabase.rpc("votos_por_escuela_2023", { p_categoria: categoria, p_listas: listas });
       if (error) return { error: error.message };
       const min = Number.isFinite(Number(args.min)) ? Number(args.min) : 100;
       const max = Number.isFinite(Number(args.max)) ? Number(args.max) : null;
-      const filas = ((data as Array<{ escuela: string; circuito: string | null; votos: number; mesas: number; electores: number }>) ?? [])
-        .filter((f) => f.votos >= min && (max == null || f.votos <= max))
-        .slice(0, lim(args.limite, 15, 30));
-      return { listas_analizadas: listas, ...(notaPreset ? { nota: notaPreset } : {}), umbral: { min, max }, escuelas: filas };
+      const enUmbral = ((data as Array<{ escuela: string; circuito: string | null; votos: number; mesas: number; electores: number }>) ?? [])
+        .filter((f) => f.votos >= min && (max == null || f.votos <= max));
+      const filas = enUmbral.slice(0, lim(args.limite, 15, 30));
+      return {
+        listas_analizadas: listas,
+        ...(notaSeleccion ? { nota: notaSeleccion } : {}),
+        umbral: { min, max },
+        escuelas_en_umbral: enUmbral.length,
+        mostradas: filas.length,
+        ...(enUmbral.length > filas.length ? { aviso: `hay ${enUmbral.length} escuelas en el umbral; se muestran las ${filas.length} de más votos` } : {}),
+        escuelas: filas,
+      };
     }
 
     case "estado_estrategia": {
       const categoria = String(args.categoria ?? "CONCEJAL");
-      const { data: todas } = await supabase.rpc("listas_2023", { p_categoria: categoria });
-      const listas = presetPeronismoDisperso((todas as Lista2023[]) ?? []);
+      const listas = await resolverSeleccion(supabase, categoria);
       if (listas.length === 0) return { error: "sin datos 2023 cargados" };
       const { data, error } = await supabase.rpc("estrategia_resumen", { p_categoria: categoria, p_listas: listas, p_meta: META_VOTOS });
       if (error) return { error: error.message };
       const r = data as { meta: number; escuelas_incluidas: number; votos_incluidos: number };
-      return { ...r, avance_pct: r.meta > 0 ? Math.round((100 * r.votos_incluidos) / r.meta) : 0, nota: "votos según preselección peronismo disperso (categoría " + categoria + ")" };
+      return {
+        ...r,
+        avance_pct: r.meta > 0 ? Math.round((100 * r.votos_incluidos) / r.meta) : 0,
+        nota: `votos según la selección de listas del equipo (categoría ${categoria}, la misma de la pantalla Estrategia)`,
+      };
+    }
+
+    case "frontera_20k": {
+      const categoria = String(args.categoria ?? "CONCEJAL");
+      const listas = await resolverSeleccion(supabase, categoria);
+      if (listas.length === 0) return { error: "sin listas seleccionadas" };
+      const { data, error } = await supabase.rpc("prioridad_escuelas", {
+        p_categoria: categoria,
+        p_listas: listas,
+        p_meta: META_VOTOS,
+      });
+      if (error) return { error: error.message };
+      type Fila = { escuela: string; circuito: string; votos_dispersos: number; pct_disperso: number | null; referentes: number; incluida: boolean; score: number; tier: string; en_frontera: boolean };
+      const filas = (data as Fila[]) ?? [];
+      const frontera = filas.filter((f) => f.en_frontera);
+      const huerfanos = filas.filter((f) => f.referentes === 0).reduce((a, f) => a + Number(f.votos_dispersos), 0);
+      return {
+        meta: META_VOTOS,
+        escuelas_analizadas: filas.length,
+        frontera: { escuelas: frontera.length, votos: frontera.reduce((a, f) => a + Number(f.votos_dispersos), 0) },
+        votos_huerfanos: huerfanos,
+        nota: "huérfanos = votos dispersos 2023 en circuitos SIN referente asignado; score = 50% volumen + 30% propensión + 20% descubierto",
+        top: filas.slice(0, lim(args.limite, 12, 25)).map((f) => ({
+          tier: f.tier,
+          escuela: f.escuela,
+          circuito: f.circuito,
+          votos: f.votos_dispersos,
+          pct_disperso: f.pct_disperso,
+          referentes: f.referentes,
+          en_estrategia: f.incluida,
+          score: f.score,
+        })),
+      };
     }
 
     case "accionar_mapa": {

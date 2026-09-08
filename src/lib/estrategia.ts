@@ -1,4 +1,5 @@
-import type { Lista2023 } from "./padron";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { obtenerListas2023, type Lista2023 } from "./padron";
 
 /**
  * Estrategia "voto disperso 2023": preselección editable de listas.
@@ -47,4 +48,35 @@ export function guardarSeleccion(categoria: string, listas: number[]) {
   } catch {
     // sin persistencia local: no es grave
   }
+}
+
+// ── Selección compartida en la base (tabla estrategia_listas) ────────────────
+// Una sola verdad para la pantalla Estrategia, el mapa y Migue. localStorage
+// queda como cache/fallback si la base aún no tiene selección guardada.
+
+export async function leerSeleccionDB(supabase: SupabaseClient, categoria: string): Promise<number[] | null> {
+  const { data } = await supabase.from("estrategia_listas").select("lista_numero").eq("categoria", categoria);
+  const filas = (data as Array<{ lista_numero: number }>) ?? [];
+  return filas.length > 0 ? filas.map((f) => f.lista_numero) : null;
+}
+
+export async function guardarSeleccionDB(supabase: SupabaseClient, categoria: string, listas: number[]) {
+  await supabase.from("estrategia_listas").delete().eq("categoria", categoria);
+  if (listas.length > 0) {
+    await supabase.from("estrategia_listas").insert(listas.map((n) => ({ categoria, lista_numero: n })));
+  }
+  guardarSeleccion(categoria, listas);
+}
+
+/** Resolución canónica: base → cache local → preselección mecánica. */
+export async function resolverSeleccion(supabase: SupabaseClient, categoria: string): Promise<number[]> {
+  const db = await leerSeleccionDB(supabase, categoria);
+  if (db && db.length > 0) {
+    guardarSeleccion(categoria, db);
+    return db;
+  }
+  const local = leerSeleccion(categoria);
+  if (local && local.length > 0) return local;
+  const todas = await obtenerListas2023(supabase, categoria);
+  return presetPeronismoDisperso(todas);
 }

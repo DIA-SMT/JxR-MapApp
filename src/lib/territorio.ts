@@ -27,17 +27,37 @@ export function useTerritorio() {
   const [cargando, setCargando] = useState(true);
 
   const recargar = useCallback(async () => {
+    // Supabase corta en 1000 filas SIN error: hay que paginar o el mapa
+    // pintaría cobertura y KPIs con datos truncados a medida que crece el operativo.
+    const PAGINA = 1000;
+    async function paginado<T>(pedir: (desde: number, hasta: number) => PromiseLike<{ data: unknown }>): Promise<T[]> {
+      const filas: T[] = [];
+      for (let desde = 0; ; desde += PAGINA) {
+        const { data } = await pedir(desde, desde + PAGINA - 1);
+        const lote = (data as T[]) ?? [];
+        filas.push(...lote);
+        if (lote.length < PAGINA) break;
+      }
+      return filas;
+    }
     const [p, a, t] = await Promise.all([
-      supabase.from("personas").select("id, nombre, documento, direccion, telefono, email, notas").order("nombre"),
-      supabase
-        .from("asignaciones")
-        .select("id, persona_id, tipo, codigo, rol_asignacion, personas (id, nombre, documento, direccion, telefono, email, notas)")
-        .order("creado_en"),
-      supabase.from("tareas").select("id, asignacion_id, titulo, hecha, hecha_en").order("creado_en"),
+      paginado<Persona>((d, h) =>
+        supabase.from("personas").select("id, nombre, documento, direccion, telefono, email, notas").order("nombre").range(d, h),
+      ),
+      paginado<Asignacion>((d, h) =>
+        supabase
+          .from("asignaciones")
+          .select("id, persona_id, tipo, codigo, rol_asignacion, personas (id, nombre, documento, direccion, telefono, email, notas)")
+          .order("creado_en")
+          .range(d, h),
+      ),
+      paginado<Tarea>((d, h) =>
+        supabase.from("tareas").select("id, asignacion_id, titulo, hecha, hecha_en").order("creado_en").range(d, h),
+      ),
     ]);
-    setPersonas((p.data as Persona[]) ?? []);
-    setAsignaciones((a.data as unknown as Asignacion[]) ?? []);
-    setTareas((t.data as Tarea[]) ?? []);
+    setPersonas(p);
+    setAsignaciones(a);
+    setTareas(t);
     setCargando(false);
   }, [supabase]);
 

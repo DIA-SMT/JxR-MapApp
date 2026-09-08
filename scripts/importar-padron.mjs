@@ -68,7 +68,7 @@ for (let i = 1; i < filas.length; i++) {
   const f = filas[i];
   const dniLimpio = String(f[0] ?? "").replace(/\D/g, "");
   const nombre = String(f[2] ?? "").trim();
-  const sexoCrudo = f[8] == null ? null : String(f[8]).trim();
+  const sexoCrudo = f[8] == null ? null : String(f[8]).trim().toUpperCase();
   // filas con columnas corridas: el sexo trae texto largo → basura, afuera
   if (dniLimpio.length < 6 || !nombre || (sexoCrudo && sexoCrudo.length > 1)) {
     descartadas++;
@@ -89,7 +89,8 @@ for (let i = 1; i < filas.length; i++) {
     anio_nac_estimado: anioEstimado(Number(dniLimpio)),
   });
 }
-console.log(`válidas: ${electores.length} · descartadas: ${descartadas}`);
+const sinSexo = electores.filter((e) => e.sexo === null).length;
+console.log(`válidas: ${electores.length} · descartadas: ${descartadas} · sin sexo (quedan en total pero fuera del desglose F/M/X): ${sinSexo}`);
 
 // ── Carga ────────────────────────────────────────────────────────────────────
 const { count } = await supabase.from("electores").select("id", { count: "exact", head: true });
@@ -132,18 +133,31 @@ for (const e of electores) {
 }
 const moda = (mapa) => [...mapa.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
-await supabase.from("escuelas").delete().gte("id", 0);
+// PRESERVAR las coordenadas geocodificadas: upsert por nombre, nunca delete+insert
+// (un reimport no debe dejar el mapa sin puntos ni pisar correcciones manuales)
+const { data: previas } = await supabase.from("escuelas").select("nombre, lat, lon");
+const coords = new Map((previas ?? []).map((e) => [e.nombre, e]));
 const filasEscuelas = [...porEscuela.entries()].map(([nombre, r]) => ({
   nombre,
   circuito: moda(r.circuitos),
   electores: r.electores,
   mesas: r.mesas.size,
+  lat: coords.get(nombre)?.lat ?? null,
+  lon: coords.get(nombre)?.lon ?? null,
 }));
 for (let i = 0; i < filasEscuelas.length; i += 500) {
-  const { error } = await supabase.from("escuelas").insert(filasEscuelas.slice(i, i + 500));
+  const { error } = await supabase
+    .from("escuelas")
+    .upsert(filasEscuelas.slice(i, i + 500), { onConflict: "nombre" });
   if (error) throw new Error(`escuelas: ${error.message}`);
 }
-console.log(`escuelas: ${filasEscuelas.length}`);
+const nombresVigentes = new Set(filasEscuelas.map((f) => f.nombre));
+const bajas = (previas ?? []).filter((e) => !nombresVigentes.has(e.nombre)).map((e) => e.nombre);
+if (bajas.length > 0) {
+  await supabase.from("escuelas").delete().in("nombre", bajas);
+  console.log(`escuelas dadas de baja (ya no están en el padrón): ${bajas.length}`);
+}
+console.log(`escuelas: ${filasEscuelas.length} (coordenadas preservadas: ${filasEscuelas.filter((f) => f.lat != null).length})`);
 
 await supabase.from("mesas").delete().gte("mesa", 0);
 const filasMesas = [...porMesa.entries()].map(([mesa, m]) => ({

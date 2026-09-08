@@ -169,6 +169,26 @@ export async function obtenerVotosDeEscuela2023(
   }));
 }
 
+export interface MesaDeEscuela {
+  mesa: number;
+  electores: number;
+  votos_2023: number | null;
+  positivos_2023: number | null;
+  blanco_2023: number | null;
+  nulos_2023: number | null;
+  participacion_pct: number | null;
+}
+
+/** Detalle mesa a mesa de una escuela (electores actuales + 2023). */
+export async function obtenerMesasDeEscuela(
+  supabase: SupabaseClient,
+  escuela: string,
+  categoria = "CONCEJAL",
+): Promise<MesaDeEscuela[]> {
+  const { data } = await supabase.rpc("mesas_de_escuela", { p_escuela: escuela, p_categoria: categoria });
+  return (data as MesaDeEscuela[]) ?? [];
+}
+
 export interface Resumen2023Circuito {
   circuito: string;
   categoria: string;
@@ -189,6 +209,47 @@ export async function obtenerResumen2023Circuito(
   const { data } = await supabase.rpc("resumen_2023_circuito", { p_circuito: circuito, p_categoria: categoria });
   return (data as Resumen2023Circuito) ?? null;
 }
+
+// ── Frontera 20K: prioridad territorial ──────────────────────────────────────
+
+export interface PrioridadEscuela {
+  escuela: string;
+  circuito: string | null;
+  lat: number | null;
+  lon: number | null;
+  votos_dispersos: number;
+  positivos: number;
+  pct_disperso: number | null;
+  electores: number;
+  mesas: number;
+  referentes: number;
+  tareas_total: number;
+  tareas_hechas: number;
+  incluida: boolean;
+  score: number;
+  tier: "A" | "B" | "C";
+  acumulado: number;
+  en_frontera: boolean;
+}
+
+export async function obtenerPrioridadEscuelas(
+  supabase: SupabaseClient,
+  categoria: string,
+  listas: number[],
+  meta = 20000,
+): Promise<PrioridadEscuela[]> {
+  if (listas.length === 0) return [];
+  const { data } = await supabase.rpc("prioridad_escuelas", {
+    p_categoria: categoria,
+    p_listas: listas,
+    p_meta: meta,
+  });
+  return (data as PrioridadEscuela[]) ?? [];
+}
+
+/** Las filas 'Mesa N' son mesas 2023 sin escuela en el padrón vigente:
+ *  se analizan pero NUNCA integran el universo trabajable. */
+export const esMesaSinEscuela = (nombre: string) => /^Mesa \d+$/.test(nombre);
 
 // ── Segmentos (microsegmentación del padrón) ─────────────────────────────────
 

@@ -1,9 +1,15 @@
 "use client";
 
-import { Check, Goal, MapPin, School, Square, X } from "lucide-react";
+import { Check, Goal, MapPin, School, Square, Table2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { leerSeleccion, presetPeronismoDisperso } from "@/lib/estrategia";
-import { obtenerListas2023, obtenerVotosDeEscuela2023, type Escuela, type Lista2023 } from "@/lib/padron";
+import { resolverSeleccion } from "@/lib/estrategia";
+import {
+  obtenerMesasDeEscuela,
+  obtenerVotosDeEscuela2023,
+  type Escuela,
+  type Lista2023,
+  type MesaDeEscuela,
+} from "@/lib/padron";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const numero = (n: number) => n.toLocaleString("es-AR");
@@ -18,36 +24,48 @@ export function PanelEscuela({
   escuela,
   usuarioId,
   onVerCircuito,
+  onCambioEstrategia,
   onCerrar,
 }: {
   supabase: SupabaseClient;
   escuela: Escuela;
   usuarioId: string | null;
   onVerCircuito: (circuito: string) => void;
+  onCambioEstrategia?: (escuela: string, incluida: boolean) => void;
   onCerrar: () => void;
 }) {
   const [listas, setListas] = useState<Lista2023[]>([]);
   const [seleccionDispersa, setSeleccionDispersa] = useState<Set<number>>(new Set());
   const [enEstrategia, setEnEstrategia] = useState(false);
   const [cargando, setCargando] = useState(true);
+  const [mesas, setMesas] = useState<MesaDeEscuela[] | null>(null);
+  const [verMesas, setVerMesas] = useState(false);
 
   useEffect(() => {
+    // reset TOTAL al cambiar de escuela: nada del estado anterior puede
+    // mostrarse (ni escribirse) bajo el nombre de la nueva
     setCargando(true);
+    setListas([]);
+    setEnEstrategia(false);
+    setSeleccionDispersa(new Set());
+    setMesas(null);
+    setVerMesas(false);
+    let vivo = true;
     void (async () => {
-      const [ranking, marcada] = await Promise.all([
+      const [ranking, marcada, sel] = await Promise.all([
         obtenerVotosDeEscuela2023(supabase, escuela.nombre, "CONCEJAL"),
         supabase.from("estrategia_escuelas").select("incluida").eq("escuela", escuela.nombre).maybeSingle(),
+        resolverSeleccion(supabase, "CONCEJAL"),
       ]);
+      if (!vivo) return; // respuesta de una escuela que ya no está seleccionada
       setListas(ranking);
       setEnEstrategia(Boolean((marcada.data as { incluida?: boolean } | null)?.incluida));
-      let sel = leerSeleccion("CONCEJAL");
-      if (!sel || sel.length === 0) {
-        const todas = await obtenerListas2023(supabase, "CONCEJAL");
-        sel = presetPeronismoDisperso(todas);
-      }
       setSeleccionDispersa(new Set(sel));
       setCargando(false);
     })();
+    return () => {
+      vivo = false;
+    };
   }, [supabase, escuela.nombre]);
 
   const votosDispersos = useMemo(
@@ -57,12 +75,26 @@ export function PanelEscuela({
   const maxVotos = Math.max(1, ...listas.map((l) => l.votos));
 
   const alternarEstrategia = async () => {
+    if (cargando) return; // sin estado confirmado no se escribe nada
     const nuevo = !enEstrategia;
     setEnEstrategia(nuevo);
-    await supabase.from("estrategia_escuelas").upsert(
+    onCambioEstrategia?.(escuela.nombre, nuevo);
+    const { error } = await supabase.from("estrategia_escuelas").upsert(
       { escuela: escuela.nombre, incluida: nuevo, actualizado_por: usuarioId, actualizado_en: new Date().toISOString() },
       { onConflict: "escuela" },
     );
+    if (error) {
+      // revertir: la UI nunca debe quedar distinta de la base
+      setEnEstrategia(!nuevo);
+      onCambioEstrategia?.(escuela.nombre, !nuevo);
+    }
+  };
+
+  const abrirMesas = async () => {
+    setVerMesas((v) => !v);
+    if (mesas === null) {
+      setMesas(await obtenerMesasDeEscuela(supabase, escuela.nombre, "CONCEJAL"));
+    }
   };
 
   return (
@@ -102,7 +134,8 @@ export function PanelEscuela({
             </div>
             <button
               onClick={() => void alternarEstrategia()}
-              className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold transition ${
+              disabled={cargando}
+              className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold transition disabled:opacity-40 ${
                 enEstrategia
                   ? "bg-rosa text-white hover:brightness-110"
                   : "border border-rosa/40 text-rosa hover:border-rosa"
@@ -112,6 +145,59 @@ export function PanelEscuela({
               <Goal size={12} /> {enEstrategia ? "En estrategia ✓" : "Sumar a estrategia"}
             </button>
           </div>
+        </div>
+
+        {/* Mesa por mesa */}
+        <div className="rounded-xl border border-borde bg-panel-2/70 p-3">
+          <button
+            onClick={() => void abrirMesas()}
+            className="flex w-full items-center justify-between text-[10px] font-bold tracking-wide text-texto-2 uppercase"
+          >
+            <span className="flex items-center gap-1.5">
+              <Table2 size={11} /> Mesa por mesa
+            </span>
+            <span>{verMesas ? "▴" : "▾"}</span>
+          </button>
+          {verMesas && (
+            <div className="mt-2 overflow-x-auto">
+              {mesas === null && <p className="text-[11px] text-texto-3">Cargando…</p>}
+              {mesas !== null && mesas.length === 0 && (
+                <p className="text-[11px] text-texto-3">Esta escuela no tiene mesas en el padrón vigente.</p>
+              )}
+              {mesas !== null && mesas.length > 0 && (
+                <>
+                  <table className="w-full text-left text-[10px]">
+                    <thead>
+                      <tr className="border-b border-borde text-texto-3">
+                        <th className="py-1 pr-2">Mesa</th>
+                        <th className="py-1 pr-2 text-right">Electores</th>
+                        <th className="py-1 pr-2 text-right">Votos 23</th>
+                        <th className="py-1 pr-2 text-right" title="Votos 2023 sobre electores actuales de la mesa (aprox)">Part.%</th>
+                        <th className="py-1 text-right">Bl/Nu</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mesas.map((m) => (
+                        <tr key={m.mesa} className="border-b border-borde/40">
+                          <td className="num py-1 pr-2 font-bold">{m.mesa}</td>
+                          <td className="num py-1 pr-2 text-right">{numero(m.electores)}</td>
+                          <td className="num py-1 pr-2 text-right">{m.votos_2023 != null ? numero(m.votos_2023) : "—"}</td>
+                          <td className="num py-1 pr-2 text-right">{m.participacion_pct != null ? `${m.participacion_pct}%` : "—"}</td>
+                          <td className="num py-1 text-right text-texto-3">
+                            {m.blanco_2023 != null ? `${m.blanco_2023}/${m.nulos_2023}` : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="mt-1.5 text-[9px] text-texto-3">
+                    Part.% = votos Concejal 2023 sobre los electores ACTUALES de la mesa (aprox: el padrón creció).
+                    Las mesas sin datos 2023 son nuevas.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Ranking de listas 2023 en esta escuela */}

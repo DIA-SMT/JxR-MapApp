@@ -62,6 +62,7 @@ for (let i = 0; i < crudas.length; i++) {
 const RE_LISTA = /^(\d{1,3})\s+-\s+(.+?)(\d+)$/;
 const resultados = [];
 const totales = [];
+const nombresPorLista = new Map();
 let circuito = null, mesa = null, categoria = null;
 let esperandoTotales = null; // etiquetas acumuladas → luego N números
 let sinClasificar = 0;
@@ -80,7 +81,13 @@ for (let i = 0; i < lineas.length; i++) {
     continue;
   }
   if (l === "MESA :") {
-    mesa = Number(lineas[++i]);
+    const cruda = Number(lineas[++i]);
+    if (Number.isInteger(cruda) && cruda > 0) {
+      mesa = cruda;
+    } else {
+      mesa = null;
+      console.warn(`MESA no numérica cerca de la línea ${i}: "${lineas[i]}" — bloque descartado`);
+    }
     continue;
   }
   if (CATEGORIAS.has(l) && (lineas[i + 1] ?? "") === "CATEGORIA :") {
@@ -112,15 +119,28 @@ for (let i = 0; i < lineas.length; i++) {
   }
 
   const m = l.match(RE_LISTA);
-  if (m && categoria && mesa != null) {
-    resultados.push({
-      categoria,
-      mesa,
-      circuito,
-      lista_numero: Number(m[1]),
-      lista_nombre: m[2].trim(),
-      votos: Number(m[3]),
-    });
+  if (m && categoria && Number.isInteger(mesa)) {
+    const listaNumero = Number(m[1]);
+    const listaNombre = m[2].trim();
+    const votos = Number(m[3]);
+    // Plausibilidad: una mesa no supera ~400 electores. Un nombre de lista que
+    // termina en dígitos rompería la regex silenciosamente (nombre+votos
+    // pegados) — esto lo detecta y frena en vez de inflar votos.
+    if (votos > 400) {
+      throw new Error(
+        `Votos implausibles (${votos}) en mesa ${mesa}, "${l}": probable nombre de lista terminado en dígitos. Revisar RE_LISTA.`,
+      );
+    }
+    const claveLista = `${categoria}|${listaNumero}`;
+    const nombreVisto = nombresPorLista.get(claveLista);
+    if (nombreVisto === undefined) {
+      nombresPorLista.set(claveLista, listaNombre);
+    } else if (nombreVisto !== listaNombre) {
+      throw new Error(
+        `Nombre inconsistente para lista ${listaNumero} (${categoria}): "${nombreVisto}" vs "${listaNombre}" en mesa ${mesa} — el parser cortó mal la línea "${l}".`,
+      );
+    }
+    resultados.push({ categoria, mesa, circuito, lista_numero: listaNumero, lista_nombre: listaNombre, votos });
     continue;
   }
   sinClasificar++;
@@ -172,7 +192,7 @@ for (let i = 0; i < resultados.length; i += LOTE) {
 const vistos = new Set();
 const totalesUnicos = totales.filter((t) => {
   const k = `${t.categoria}|${t.mesa}`;
-  if (vistos.has(k) || !t.categoria || t.mesa == null) return false;
+  if (vistos.has(k) || !t.categoria || !Number.isInteger(t.mesa)) return false;
   vistos.add(k);
   return true;
 });
@@ -180,4 +200,12 @@ for (let i = 0; i < totalesUnicos.length; i += LOTE) {
   const { error } = await supabase.from("mesas_2023_totales").insert(totalesUnicos.slice(i, i + LOTE));
   if (error) throw new Error(`totales lote ${i}: ${error.message}`);
 }
-console.log(`LISTO: ${resultados.length} filas de votos + ${totalesUnicos.length} totales de mesa.`);
+
+// Verificación final: la tabla debe tener EXACTAMENTE lo parseado (una carga
+// parcial silenciosa dejaría todos los agregados mintiendo).
+const { count: enTabla } = await supabase.from("resultados_2023").select("id", { count: "exact", head: true });
+if (enTabla !== resultados.length) {
+  console.error(`ATENCIÓN: la tabla quedó con ${enTabla} filas y el parser produjo ${resultados.length}. Carga PARCIAL: correr de nuevo con --reemplazar.`);
+  process.exit(1);
+}
+console.log(`LISTO: ${resultados.length} filas de votos + ${totalesUnicos.length} totales de mesa (verificado).`);

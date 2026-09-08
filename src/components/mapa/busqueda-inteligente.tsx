@@ -10,7 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 /** Acción estructurada que la búsqueda le pide al mapa. */
 export type AccionInteligente =
   | { accion: "ir_espacio"; tipo: TipoEspacio; codigo: string }
-  | { accion: "vista"; vista: "operativo" | "padron" | "escuelas" | "v2023" }
+  | { accion: "vista"; vista: "operativo" | "padron" | "escuelas" | "v2023" | "prioridad" }
   | { accion: "filtros_padron"; sexo?: "F" | "M" | "todos"; franja?: string }
   | { accion: "escuelas_min"; minimo: number };
 
@@ -150,7 +150,7 @@ export function BusquedaInteligente({
           setQ("");
           break;
         case "vista": {
-          const vista = String(a.vista) as "operativo" | "padron" | "escuelas" | "v2023";
+          const vista = String(a.vista) as "operativo" | "padron" | "escuelas" | "v2023" | "prioridad";
           onAccion({ accion: "vista", vista });
           onAviso(`Vista ${vista === "v2023" ? "2023" : vista}`);
           setQ("");
