@@ -36,9 +36,11 @@ function ConNegritas({ texto }: { texto: string }) {
 }
 
 const SUGERENCIAS = [
+  "¿Dónde están las mayores oportunidades de crecimiento en 2025?",
+  "¿En qué mesas perdimos por menos de 50 votos?",
+  "¿Qué lista sufrió más corte de boleta en 2023 y dónde?",
+  "Compará el 2023 con el 2025 por circuito: ¿dónde crecimos y dónde caímos?",
   "¿Dónde vota Pérez Juan?",
-  "¿En qué escuelas el peronismo disperso sacó entre 150 y 300 votos?",
-  "¿Cuántos electores tiene el circuito 15B?",
   "¿Cómo viene la estrategia contra la meta de 20.000?",
 ];
 
