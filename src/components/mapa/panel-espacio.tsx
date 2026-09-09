@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Plus, School, Search, Square, Trash2, UserPlus, Vote, X } from "lucide-react";
+import { Check, Plus, School, Search, Sparkles, Square, Trash2, UserPlus, Vote, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { etiquetaEspacio } from "@/lib/espacios";
 import {
@@ -11,8 +11,21 @@ import {
   type ElectorEncontrado,
   type Resumen2023Circuito,
 } from "@/lib/padron";
+import {
+  armarMesasPeleadas,
+  obtenerMesas2025Circuito,
+  obtenerRankingCircuito,
+  obtenerVotos2025Circuito,
+  type FilaRankingEspacio,
+  type MesaPeleada,
+} from "@/lib/analisis";
+import cruceBarrios from "@/lib/datos/barrios-circuitos.json";
 import type { ResumenEspacio, useTerritorio } from "@/lib/territorio";
 import type { SeleccionEspacio } from "./mapa-electoral";
+
+const BARRIOS_POR_CIRCUITO = (cruceBarrios as unknown as {
+  por_circuito: Record<string, Array<{ barrio: string; pct: number }>>;
+}).por_circuito;
 
 const numero = (n: number) => n.toLocaleString("es-AR");
 
@@ -61,6 +74,13 @@ export function PanelEspacio({
   const [electores, setElectores] = useState<ElectorEncontrado[]>([]);
   const [r2023, setR2023] = useState<Resumen2023Circuito | null>(null);
   const [ver2023, setVer2023] = useState(false);
+  // Resultados 2025 (provisorio): ranking del circuito + mesa por mesa
+  const [r2025, setR2025] = useState<FilaRankingEspacio[] | null>(null);
+  const [tot2025, setTot2025] = useState<{ electores: number; votantes: number; blanco: number } | null>(null);
+  const [mesas2025, setMesas2025] = useState<MesaPeleada[] | null>(null);
+  const [ver2025, setVer2025] = useState(false);
+  const [verMesas25, setVerMesas25] = useState(false);
+  const [verBarrios, setVerBarrios] = useState(false);
   useEffect(() => {
     setPadron(null);
     setElectores([]);
@@ -68,10 +88,44 @@ export function PanelEspacio({
     setVerEscuelas(false);
     setR2023(null);
     setVer2023(false);
+    setR2025(null);
+    setTot2025(null);
+    setMesas2025(null);
+    setVer2025(false);
+    setVerMesas25(false);
+    setVerBarrios(false);
     if (seleccion.tipo !== "circuito") return;
-    void obtenerPadronDeCircuito(supabase, seleccion.codigo).then(setPadron);
-    void obtenerResumen2023Circuito(supabase, seleccion.codigo, "CONCEJAL").then(setR2023);
+    const vivo = { actual: true };
+    void obtenerPadronDeCircuito(supabase, seleccion.codigo).then((d) => vivo.actual && setPadron(d));
+    void obtenerResumen2023Circuito(supabase, seleccion.codigo, "CONCEJAL").then((d) => vivo.actual && setR2023(d));
+    void obtenerRankingCircuito(supabase, "2025", seleccion.codigo).then((d) => vivo.actual && setR2025(d));
+    void Promise.all([
+      obtenerMesas2025Circuito(supabase, seleccion.codigo),
+      obtenerVotos2025Circuito(supabase, seleccion.codigo),
+    ]).then(([mesas, votos]) => {
+      if (!vivo.actual) return;
+      setTot2025({
+        electores: mesas.reduce((a, m) => a + m.electores, 0),
+        votantes: mesas.reduce((a, m) => a + m.total, 0),
+        blanco: mesas.reduce((a, m) => a + m.blanco, 0),
+      });
+      setMesas2025(armarMesasPeleadas(votos, mesas));
+    });
+    return () => {
+      vivo.actual = false;
+    };
   }, [supabase, seleccion.tipo, seleccion.codigo]);
+
+  const barriosDelCircuito = seleccion.tipo === "circuito" ? (BARRIOS_POR_CIRCUITO[seleccion.codigo] ?? []) : [];
+
+  /** Abre a Migue con el análisis estratégico de este circuito ya pedido. */
+  const pedirAnalisisMigue = () => {
+    window.dispatchEvent(
+      new CustomEvent("jxr:migue-preguntar", {
+        detail: `Analizá el circuito ${seleccion.codigo}: resultados 2023 y 2025, competitividad, voto en blanco y ausentes, oportunidades concretas y qué acción territorial conviene`,
+      }),
+    );
+  };
   useEffect(() => {
     const texto = qElector.trim();
     if (texto.length < 3 || seleccion.tipo !== "circuito") {
@@ -319,6 +373,154 @@ export function PanelEspacio({
               </div>
             )}
           </div>
+        )}
+
+        {/* ── Resultados 2025 del circuito (provisorio) ── */}
+        {seleccion.tipo === "circuito" && r2025 && r2025.length > 0 && (
+          <div className="rounded-xl border border-borde bg-panel-2/70 p-3">
+            <button
+              onClick={() => setVer2025((v) => !v)}
+              className="flex w-full items-center justify-between text-[11px] font-bold tracking-wide text-texto-2 uppercase"
+            >
+              <span>Resultados 2025 · Diputados <span className="font-normal normal-case text-texto-3">(provisorio)</span></span>
+              <span>{ver2025 ? "▴" : "▾"}</span>
+            </button>
+
+            {/* Competitividad: 1º vs 2º */}
+            {(() => {
+              const g = r2025[0];
+              const s = r2025[1];
+              const dif = g && s ? Number(g.votos) - Number(s.votos) : null;
+              return (
+                <div className="mt-1 space-y-0.5 text-[11px]">
+                  <div>
+                    <b className="num text-texto">{g?.lista}</b>{" "}
+                    <span className="text-texto-3">gana con</span>{" "}
+                    <b className="num">{numero(Number(g?.votos ?? 0))}</b>{" "}
+                    <span className="text-texto-3">({g?.pct}%)</span>
+                  </div>
+                  {s && dif != null && (
+                    <div className={dif <= 150 ? "font-bold text-sin" : dif <= 500 ? "font-semibold text-encurso" : "text-texto-2"}>
+                      +{numero(dif)} sobre {s.lista}
+                      {dif <= 150 ? " · ¡circuito en disputa!" : dif <= 500 ? " · competitivo" : ""}
+                    </div>
+                  )}
+                  {tot2025 && (
+                    <div className="text-texto-3">
+                      participación <b className="num text-texto-2">{tot2025.electores > 0 ? Math.round((100 * tot2025.votantes) / tot2025.electores) : 0}%</b>
+                      {" · "}blanco <b className="num text-texto-2">{numero(tot2025.blanco)}</b>
+                      {" · "}ausentes <b className="num text-texto-2">{numero(Math.max(0, tot2025.electores - tot2025.votantes))}</b>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {ver2025 && (
+              <div className="mt-2 space-y-1.5">
+                {r2025.map((l) => {
+                  const max = Math.max(1, Number(r2025[0]?.votos ?? 1));
+                  return (
+                    <div key={l.lista_id} className="text-[10px]">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 flex-1 truncate text-texto-2" title={l.lista}>
+                          {l.lista}
+                        </span>
+                        <span className="num shrink-0 font-bold">
+                          {numero(Number(l.votos))} <span className="font-normal text-texto-3">({l.pct}%)</span>
+                        </span>
+                      </div>
+                      <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-panel-3">
+                        <div className="h-full rounded-full bg-rosa/70" style={{ width: `${Math.max(2, (100 * Number(l.votos)) / max)}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Mesa por mesa: las más peleadas primero */}
+            {mesas2025 && mesas2025.length > 0 && (
+              <>
+                <button
+                  onClick={() => setVerMesas25((v) => !v)}
+                  className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-celeste hover:underline"
+                >
+                  {mesas2025.length} mesas · las más peleadas primero {verMesas25 ? "▴" : "▾"}
+                </button>
+                {verMesas25 && (
+                  <div className="mt-1.5 max-h-44 overflow-y-auto">
+                    <table className="w-full text-[10px]">
+                      <thead className="sticky top-0 bg-panel-2 text-left text-texto-3">
+                        <tr>
+                          <th className="py-0.5 pr-1 font-semibold">Mesa</th>
+                          <th className="py-0.5 pr-1 font-semibold">1º</th>
+                          <th className="num py-0.5 pr-1 text-right font-semibold" title="Diferencia entre el 1º y el 2º">Dif.</th>
+                          <th className="num py-0.5 pr-1 text-right font-semibold">Blanco</th>
+                          <th className="num py-0.5 text-right font-semibold" title="Electores que no fueron a votar">Ausen.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mesas2025.map((m) => (
+                          <tr key={m.mesa} className="border-t border-borde/60">
+                            <td className="num py-1 pr-1">{m.mesa}</td>
+                            <td className="py-1 pr-1" title={`${m.ganador} ${m.votosGanador} vs ${m.segundo ?? "—"} ${m.votosSegundo}`}>
+                              {m.ganador} <span className="text-texto-3">vs {m.segundo ?? "—"}</span>
+                            </td>
+                            <td className={`num py-1 pr-1 text-right ${m.diferencia <= 20 ? "font-bold text-sin" : m.diferencia <= 50 ? "font-semibold text-encurso" : ""}`}>
+                              {m.diferencia}
+                            </td>
+                            <td className="num py-1 pr-1 text-right text-texto-2">{m.blanco}</td>
+                            <td className="num py-1 text-right text-texto-2">{m.ausentes}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <p className="mt-1 text-[9px] text-texto-3">
+                      Mesas de la elección nacional 2025: su numeración no es la del padrón provincial.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── Barrios que componen el circuito ── */}
+        {seleccion.tipo === "circuito" && barriosDelCircuito.length > 0 && (
+          <div className="rounded-xl border border-borde bg-panel-2/70 p-3">
+            <button
+              onClick={() => setVerBarrios((v) => !v)}
+              className="flex w-full items-center justify-between text-[11px] font-bold tracking-wide text-texto-2 uppercase"
+            >
+              <span>{barriosDelCircuito.length} barrios en el circuito</span>
+              <span>{verBarrios ? "▴" : "▾"}</span>
+            </button>
+            {verBarrios && (
+              <div className="mt-2 flex max-h-36 flex-wrap gap-1 overflow-y-auto">
+                {barriosDelCircuito.map((b) => (
+                  <span
+                    key={b.barrio}
+                    className="rounded-full border border-borde-2 px-2 py-0.5 text-[10px] text-texto-2"
+                    title={`${b.pct}% del barrio cae en este circuito`}
+                  >
+                    {b.barrio}{b.pct < 50 ? ` (${b.pct}%)` : ""}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Análisis estratégico con un clic ── */}
+        {seleccion.tipo === "circuito" && (
+          <button
+            onClick={pedirAnalisisMigue}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-rosa/40 px-3 py-2 text-[11px] font-bold text-rosa transition hover:border-rosa hover:bg-rosa/5"
+            title="Migue cruza 2023, 2025, blancos, ausentes y cobertura y te propone la acción territorial"
+          >
+            <Sparkles size={12} /> Análisis estratégico de Migue para este circuito
+          </button>
         )}
 
         {asignaciones.length === 0 && (

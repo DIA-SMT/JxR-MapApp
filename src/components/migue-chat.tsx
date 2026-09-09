@@ -104,6 +104,21 @@ export function MigueChat() {
       setPensando(false);
     }
   };
+  const enviarRef = useRef(enviar);
+  enviarRef.current = enviar;
+
+  // La app puede pedirle un análisis a Migue (ej: botón del panel del circuito):
+  // abre el chat y manda la pregunta como si la hubiera escrito el usuario.
+  useEffect(() => {
+    const alPreguntar = (e: Event) => {
+      const texto = (e as CustomEvent<string>).detail;
+      if (!texto || typeof texto !== "string") return;
+      setAbierto(true);
+      void enviarRef.current(texto);
+    };
+    window.addEventListener("jxr:migue-preguntar", alPreguntar);
+    return () => window.removeEventListener("jxr:migue-preguntar", alPreguntar);
+  }, []);
 
   return (
     <>
