@@ -1,7 +1,7 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import { Box, Layers, Route, Satellite, Waypoints } from "lucide-react";
+import { Box, Building2, Layers, Route, Satellite, Waypoints } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Layer,
@@ -33,6 +33,16 @@ import type { TipoEspacio } from "@/lib/tipos";
 import { BusquedaInteligente, type AccionInteligente } from "./busqueda-inteligente";
 import { PanelEscuela } from "./panel-escuela";
 import { PanelEspacio } from "./panel-espacio";
+import cruceBarrios from "@/lib/datos/barrios-circuitos.json";
+
+/** Barrios oficiales con su bbox y el cruce a circuitos (JSON estático). */
+export interface BarrioCruce {
+  id: number | null;
+  nombre: string;
+  bbox: number[];
+  circuitos: Array<{ circuito: string; pct: number }>;
+}
+const BARRIOS: BarrioCruce[] = (cruceBarrios as unknown as { barrios: BarrioCruce[] }).barrios;
 
 /** Capas de territorio: polígonos de distritos y circuitos electorales. */
 type FCPoligono = FeatureCollection<Polygon | MultiPolygon, Record<string, unknown>>;
@@ -406,6 +416,38 @@ function asegurarIconoEscuela(mapa: MapaLibre) {
     // sin canvas/emoji: la capa de halos sigue mostrando las escuelas
   }
 }
+// ── Barrios oficiales (contexto territorial: nombres y límites suaves) ───────
+const capaBarriosLinea = (tema: Tema): LayerProps => ({
+  id: "barrios-linea",
+  type: "line",
+  source: "barrios",
+  paint: {
+    "line-color": tema === "claro" ? "#b45309" : "#f2c94c",
+    "line-opacity": 0.35,
+    "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.6, 15, 1.4],
+    "line-dasharray": [2, 2],
+  },
+});
+const capaBarriosNombre = (tema: Tema): LayerProps => ({
+  id: "barrios-nombre",
+  type: "symbol",
+  source: "barrios",
+  minzoom: 12.5,
+  layout: {
+    "text-field": ["get", "nombre"],
+    "text-font": ["Open Sans Italic"],
+    "text-size": ["interpolate", ["linear"], ["zoom"], 12.5, 9, 16, 12],
+    "text-max-width": 8,
+    "text-letter-spacing": 0.05,
+  },
+  paint: {
+    "text-color": tema === "claro" ? "#92610a" : "#f2c94c",
+    "text-opacity": 0.85,
+    "text-halo-color": COLORES[tema].halo,
+    "text-halo-width": 1.6,
+  },
+});
+
 const capaEscuelasNombre = (tema: Tema): LayerProps => ({
   id: "escuelas-nombre",
   type: "symbol",
@@ -551,6 +593,7 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
   const [verSatelite, setVerSatelite] = useState(false);
   const [verAvenidas, setVerAvenidas] = useState(true);
   const [verCalles, setVerCalles] = useState(true);
+  const [verBarrios, setVerBarrios] = useState(false);
   const [hayAnclaEtiquetas, setHayAnclaEtiquetas] = useState(true);
   const [aviso, setAviso] = useState<string | null>(null);
   const [usuarioId, setUsuarioId] = useState<string | null>(null);
@@ -691,10 +734,16 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
   // GeoJSON crudos
   const [distritosGeo, setDistritosGeo] = useState<FCPoligono | null>(null);
   const [circuitosGeo, setCircuitosGeo] = useState<FCPoligono | null>(null);
+  const [barriosGeo, setBarriosGeo] = useState<FCPoligono | null>(null);
   useEffect(() => {
     fetch("/data/distritos.json").then((r) => r.json()).then(setDistritosGeo).catch(() => {});
     fetch("/data/circuitos.json").then((r) => r.json()).then(setCircuitosGeo).catch(() => {});
   }, []);
+  // Barrios: recién cuando se activan (152 KB que la mayoría de las sesiones no usa)
+  useEffect(() => {
+    if (!verBarrios || barriosGeo) return;
+    fetch("/data/barrios.json").then((r) => r.json()).then(setBarriosGeo).catch(() => {});
+  }, [verBarrios, barriosGeo]);
 
   // GeoJSON enriquecidos con operativo + padrón + 2023
   const enriquecer = (geo: FCPoligono | null, tipo: TipoEspacio): FCPoligono | null => {
@@ -813,7 +862,23 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
         }
         break;
       }
+      case "barrio": {
+        const b = BARRIOS.find((x) => x.nombre === a.nombre);
+        if (!b) break;
+        setVerBarrios(true);
+        const mapa = mapRef.current?.getMap();
+        mapa?.fitBounds([[b.bbox[0], b.bbox[1]], [b.bbox[2], b.bbox[3]]], {
+          padding: 120,
+          maxZoom: 15,
+          duration: 900,
+        });
+        avisar(
+          `Barrio ${b.nombre} · circuito${b.circuitos.length === 1 ? "" : "s"} ${b.circuitos.map((c) => `${c.circuito} (${c.pct}%)`).join(", ")}`,
+        );
+        break;
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const alternar3D = () => {
@@ -1058,6 +1123,14 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
           );
         })}
 
+        {verBarrios && barriosGeo && (
+          <Source id="barrios" type="geojson" data={barriosGeo}>
+            {/* key con tipoActivo/ver3D: remonta la capa arriba cuando el territorio se remonta */}
+            <Layer key={`barrios-linea-${tipoActivo}-${ver3D}`} {...capaBarriosLinea(tema)} />
+            <Layer key={`barrios-nombre-${tipoActivo}-${ver3D}`} {...capaBarriosNombre(tema)} />
+          </Source>
+        )}
+
         {vista === "escuelas" && escuelasGeo.features.length > 0 && (
           <Source id="escuelas" type="geojson" data={escuelasGeo}>
             <Layer {...capaEscuelasCalor} />
@@ -1150,6 +1223,15 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
             <Waypoints size={12} /> Calles
           </button>
           <button
+            onClick={() => setVerBarrios((v) => !v)}
+            title="Límites y nombres de los 327 barrios oficiales (mapa municipal) — para nombrar el territorio como lo conoce la gente"
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold transition ${
+              verBarrios ? "bg-panel-3 text-texto" : "text-texto-3 hover:text-texto"
+            }`}
+          >
+            <Building2 size={12} /> Barrios
+          </button>
+          <button
             onClick={() => setVerSatelite((v) => !v)}
             title="Imagen satelital real (Esri) — los nombres de calles quedan encima"
             className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold transition ${
@@ -1160,7 +1242,7 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
           </button>
         </div>
 
-        <BusquedaInteligente supabase={supabase} escuelas={escuelas} onAccion={ejecutarAccion} onAviso={avisar} />
+        <BusquedaInteligente supabase={supabase} escuelas={escuelas} barrios={BARRIOS} onAccion={ejecutarAccion} onAviso={avisar} />
       </div>
 
       {/* ── Segunda fila: KPIs + microsegmentación ── */}

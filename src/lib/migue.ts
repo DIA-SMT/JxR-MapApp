@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { CODIGOS, esEspacioValido, etiquetaEspacio } from "./espacios";
 import { META_VOTOS, resolverSeleccion } from "./estrategia";
 import type { Asignacion, Tarea, TipoEspacio } from "./tipos";
+import cruceBarrios from "./datos/barrios-circuitos.json";
 
 /**
  * Migue — asistente del comando territorial JxR. Responde consultando los
@@ -194,6 +195,184 @@ export const HERRAMIENTAS_MIGUE = [
         type: "object",
         properties: {
           categoria: { type: "string", enum: ["CONCEJAL", "LEGISLADOR", "INTENDENTE", "GOBERNADOR"], description: "default CONCEJAL" },
+        },
+      },
+    },
+  },
+  // ── Análisis electoral estratégico (2023 definitivo + 2025 provisorio) ──
+  {
+    type: "function",
+    function: {
+      name: "listas_eleccion",
+      description:
+        "Ranking de listas/agrupaciones de una elección con votos totales y %. eleccion '2023' (Gobernador/Legislador/Intendente/Concejal, definitivo) o '2025' (Diputado Nacional, provisorio). Usala para conocer los números de lista antes de otros análisis.",
+      parameters: {
+        type: "object",
+        properties: {
+          eleccion: { type: "string", enum: ["2023", "2025"] },
+          categoria: { type: "string", enum: ["CONCEJAL", "LEGISLADOR", "INTENDENTE", "GOBERNADOR"], description: "solo 2023; default CONCEJAL" },
+        },
+        required: ["eleccion"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ganadores_espacios",
+      description:
+        "Qué lista GANÓ en cada mesa/escuela/circuito, con el segundo y la diferencia. orden 'competitivo' = los espacios más peleados primero (para detectar dónde se define por pocos votos); orden 'votos' = los más grandes primero.",
+      parameters: {
+        type: "object",
+        properties: {
+          eleccion: { type: "string", enum: ["2023", "2025"] },
+          categoria: { type: "string", enum: ["CONCEJAL", "LEGISLADOR", "INTENDENTE", "GOBERNADOR"], description: "solo 2023" },
+          nivel: { type: "string", enum: ["mesa", "escuela", "circuito"], description: "2025 no tiene nivel escuela" },
+          orden: { type: "string", enum: ["competitivo", "votos"] },
+          limite: { type: "number", description: "máx 40" },
+        },
+        required: ["eleccion", "nivel"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ranking_espacio",
+      description:
+        "Ranking completo de listas DENTRO de una mesa, escuela o circuito concreto ('cómo dio la mesa 214', 'ranking del circuito 15B en 2025').",
+      parameters: {
+        type: "object",
+        properties: {
+          eleccion: { type: "string", enum: ["2023", "2025"] },
+          categoria: { type: "string", enum: ["CONCEJAL", "LEGISLADOR", "INTENDENTE", "GOBERNADOR"] },
+          nivel: { type: "string", enum: ["mesa", "escuela", "circuito"] },
+          codigo: { type: "string", description: "'214' (mesa), nombre exacto de la escuela, o '15B' (circuito)" },
+        },
+        required: ["eleccion", "nivel", "codigo"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "desempeno_lista",
+      description:
+        "Rendimiento de UNA lista espacio por espacio: votos, %, posición y desvío contra su promedio general — dónde rinde por encima o por debajo, sus mejores y peores mesas/escuelas/circuitos.",
+      parameters: {
+        type: "object",
+        properties: {
+          eleccion: { type: "string", enum: ["2023", "2025"] },
+          categoria: { type: "string", enum: ["CONCEJAL", "LEGISLADOR", "INTENDENTE", "GOBERNADOR"] },
+          lista: { type: "number", description: "número de lista (2023) o id de agrupación (2025, ver listas_eleccion)" },
+          nivel: { type: "string", enum: ["mesa", "escuela", "circuito"] },
+          orden: { type: "string", enum: ["mejores", "peores"], description: "default mejores" },
+          limite: { type: "number", description: "máx 25" },
+        },
+        required: ["eleccion", "lista"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "voto_blanco",
+      description:
+        "Voto en blanco por mesa/escuela/circuito y por cargo (2023 tiene los 4 cargos: sirve para comparar blancos entre Intendente/Concejal/Legislador en el mismo lugar). Ordenado de mayor a menor % de blanco.",
+      parameters: {
+        type: "object",
+        properties: {
+          eleccion: { type: "string", enum: ["2023", "2025"] },
+          nivel: { type: "string", enum: ["mesa", "escuela", "circuito"] },
+          limite: { type: "number", description: "máx 30 espacios" },
+        },
+        required: ["eleccion", "nivel"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "corte_boleta",
+      description:
+        "CORTE DE BOLETA 2023 (4 cargos simultáneos): sin lista → resumen de todas las listas (votos por cargo, cuál arrastra y cuál pierde, % de retención); con lista → el corte de ESA lista espacio por espacio (dónde el elector la votó en un cargo y la cortó en otro). Retención baja = mucho corte; el candidato con más votos que su lista en otros cargos tiene voto personal.",
+      parameters: {
+        type: "object",
+        properties: {
+          lista: { type: "number", description: "número de lista 2023; omitir para el resumen general" },
+          nivel: { type: "string", enum: ["mesa", "escuela", "circuito"], description: "solo con lista; default escuela" },
+          limite: { type: "number", description: "máx 25" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "oportunidades",
+      description:
+        "OPORTUNIDADES: mesas/escuelas/circuitos donde una lista PERDIÓ por menos de N votos (atacables con pocos votos) o GANÓ por menos de N (a defender). Incluye votos necesarios, blancos y ausentes de cada espacio (la bolsa de crecimiento).",
+      parameters: {
+        type: "object",
+        properties: {
+          eleccion: { type: "string", enum: ["2023", "2025"] },
+          categoria: { type: "string", enum: ["CONCEJAL", "LEGISLADOR", "INTENDENTE", "GOBERNADOR"] },
+          lista: { type: "number" },
+          margen: { type: "number", description: "diferencia máxima de votos (default 100; usá 50 para 'muy cerca')" },
+          nivel: { type: "string", enum: ["mesa", "escuela", "circuito"], description: "default mesa" },
+          limite: { type: "number", description: "máx 30" },
+        },
+        required: ["eleccion", "lista"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "potencial_electoral",
+      description:
+        "ÍNDICE DE POTENCIAL ELECTORAL (IPE 0-100) de una lista por mesa/escuela/circuito: combina cercanía al líder (30%), bolsa de crecimiento —blancos+ausentes— (25%), rendimiento relativo (20%), volumen propio (15%) y competitividad del espacio (10%). Devuelve tier (muy alto/alto/medio/bajo), clasificación territorial (fuerte/competitivo/potencial/débil) y las razones. ES la herramienta para '¿dónde están las mayores oportunidades de crecimiento?'",
+      parameters: {
+        type: "object",
+        properties: {
+          eleccion: { type: "string", enum: ["2023", "2025"] },
+          categoria: { type: "string", enum: ["CONCEJAL", "LEGISLADOR", "INTENDENTE", "GOBERNADOR"] },
+          lista: { type: "number" },
+          nivel: { type: "string", enum: ["mesa", "escuela", "circuito"], description: "default escuela (2025: mesa o circuito)" },
+          limite: { type: "number", description: "máx 25" },
+        },
+        required: ["eleccion", "lista"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "comparar_2023_2025",
+      description:
+        "Comparación 2023 ↔ 2025 por CIRCUITO (crecimiento, caída, migración de votos): % de una lista 2023 vs % de una agrupación 2025 en cada circuito, con participación y blancos de ambas. OJO: las mesas nacionales 2025 no se cruzan con las provinciales 2023 — la comparación válida es por circuito.",
+      parameters: {
+        type: "object",
+        properties: {
+          lista_2023: { type: "number", description: "número de lista 2023" },
+          lista_2025: { type: "number", description: "id de agrupación 2025 (ver listas_eleccion 2025)" },
+          categoria_2023: { type: "string", enum: ["CONCEJAL", "LEGISLADOR", "INTENDENTE", "GOBERNADOR"], description: "default CONCEJAL" },
+        },
+        required: ["lista_2023", "lista_2025"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "barrios",
+      description:
+        "Cruce BARRIO ↔ CIRCUITO (mapa oficial municipal, 327 barrios): con barrio → a qué circuito(s) pertenece y en qué proporción; con circuito → qué barrios lo componen. Sirve para traducir el análisis electoral a territorio concreto.",
+      parameters: {
+        type: "object",
+        properties: {
+          barrio: { type: "string", description: "nombre (o parte) del barrio, ej 'Ciudadela'" },
+          circuito: { type: "string", description: "código de circuito, ej '15B'" },
         },
       },
     },
@@ -514,6 +693,185 @@ export async function ejecutarHerramientaMigue(
       };
     }
 
+    // ── Análisis electoral estratégico ──
+    case "listas_eleccion": {
+      const { data, error } = await supabase.rpc("listas_eleccion", {
+        p_eleccion: String(args.eleccion ?? "2023"),
+        p_categoria: args.categoria ? String(args.categoria) : null,
+      });
+      if (error) return { error: error.message };
+      return {
+        eleccion: args.eleccion,
+        nota: args.eleccion === "2025" ? "Diputado Nacional 2025, escrutinio PROVISORIO (Capital)" : "escrutinio definitivo 2023",
+        listas: data,
+      };
+    }
+
+    case "ganadores_espacios": {
+      const { data, error } = await supabase.rpc("ganadores_espacios", {
+        p_eleccion: String(args.eleccion ?? "2023"),
+        p_categoria: String(args.categoria ?? "CONCEJAL"),
+        p_nivel: String(args.nivel ?? "escuela"),
+        p_orden: args.orden === "votos" ? "votos" : "competitivo",
+        p_limite: lim(args.limite, 20, 40),
+      });
+      if (error) return { error: error.message };
+      return {
+        orden: args.orden === "votos" ? "espacios más grandes primero" : "espacios más peleados primero (menor diferencia 1º-2º)",
+        espacios: data,
+      };
+    }
+
+    case "ranking_espacio": {
+      const { data, error } = await supabase.rpc("ranking_en_espacio", {
+        p_eleccion: String(args.eleccion ?? "2023"),
+        p_categoria: String(args.categoria ?? "CONCEJAL"),
+        p_nivel: String(args.nivel ?? "circuito"),
+        p_codigo: String(args.codigo ?? ""),
+      });
+      if (error) return { error: error.message };
+      const filas = (data as unknown[]) ?? [];
+      return filas.length === 0 ? { resultado: "sin datos para ese espacio (revisá el código exacto)" } : filas;
+    }
+
+    case "desempeno_lista": {
+      const { data, error } = await supabase.rpc("desempeno_lista", {
+        p_eleccion: String(args.eleccion ?? "2023"),
+        p_categoria: String(args.categoria ?? "CONCEJAL"),
+        p_lista: Number(args.lista),
+        p_nivel: String(args.nivel ?? "escuela"),
+      });
+      if (error) return { error: error.message };
+      type Fila = { espacio: string; pct: number };
+      const filas = (data as Fila[]) ?? [];
+      const n = lim(args.limite, 12, 25);
+      const peores = args.orden === "peores";
+      return {
+        espacios_donde_compite: filas.length,
+        pct_promedio_lista: filas[0] ? (filas[0] as Fila & { pct_promedio_lista: number }).pct_promedio_lista : null,
+        mostrando: peores ? "los peores (menor %)" : "los mejores (mayor %)",
+        espacios: peores ? filas.slice(-n).reverse() : filas.slice(0, n),
+      };
+    }
+
+    case "voto_blanco": {
+      const { data, error } = await supabase.rpc("voto_blanco", {
+        p_eleccion: String(args.eleccion ?? "2023"),
+        p_nivel: String(args.nivel ?? "escuela"),
+      });
+      if (error) return { error: error.message };
+      const filas = (data as unknown[]) ?? [];
+      return {
+        nota: "ordenado por % de voto en blanco descendente; en 2023 hay una fila por cargo (comparables entre sí)",
+        total_filas: filas.length,
+        top: filas.slice(0, lim(args.limite, 15, 30)),
+      };
+    }
+
+    case "corte_boleta": {
+      if (args.lista == null) {
+        const { data, error } = await supabase.rpc("corte_boleta_listas");
+        if (error) return { error: error.message };
+        return {
+          nota: "2023, toda la Capital. retencion_pct = peor cargo / mejor cargo (bajo = mucho corte). El cargo con más votos es el que arrastra.",
+          listas: data,
+        };
+      }
+      const { data, error } = await supabase.rpc("corte_boleta_espacios", {
+        p_lista: Number(args.lista),
+        p_nivel: String(args.nivel ?? "escuela"),
+      });
+      if (error) return { error: error.message };
+      const filas = (data as unknown[]) ?? [];
+      return {
+        nota: "espacios ordenados por corte (diferencia entre su mejor y peor cargo) descendente",
+        total_espacios: filas.length,
+        top: filas.slice(0, lim(args.limite, 12, 25)),
+      };
+    }
+
+    case "oportunidades": {
+      const { data, error } = await supabase.rpc("oportunidades_lista", {
+        p_eleccion: String(args.eleccion ?? "2023"),
+        p_categoria: String(args.categoria ?? "CONCEJAL"),
+        p_lista: Number(args.lista),
+        p_margen: Math.max(1, Math.min(2000, Number(args.margen) || 100)),
+        p_nivel: String(args.nivel ?? "mesa"),
+      });
+      if (error) return { error: error.message };
+      const filas = (data as Array<{ situacion: string }>) ?? [];
+      return {
+        margen: Number(args.margen) || 100,
+        atacar: filas.filter((f) => f.situacion.startsWith("pierde")).slice(0, lim(args.limite, 15, 30)),
+        defender: filas.filter((f) => f.situacion.startsWith("gana")).slice(0, lim(args.limite, 15, 30)),
+        nota: "ausentes = electores que no votaron; junto a los blancos son la bolsa de crecimiento de cada espacio",
+      };
+    }
+
+    case "potencial_electoral": {
+      const { data, error } = await supabase.rpc("potencial_electoral", {
+        p_eleccion: String(args.eleccion ?? "2023"),
+        p_categoria: String(args.categoria ?? "CONCEJAL"),
+        p_lista: Number(args.lista),
+        p_nivel: String(args.nivel ?? (args.eleccion === "2025" ? "circuito" : "escuela")),
+      });
+      if (error) return { error: error.message };
+      type Fila = { tier: string; clasificacion: string };
+      const filas = (data as Fila[]) ?? [];
+      const porTier = (t: string) => filas.filter((f) => f.tier === t).length;
+      return {
+        formula: "IPE = 30% cercanía al líder + 25% bolsa (blancos+ausentes) + 20% rendimiento relativo + 15% volumen + 10% competitividad",
+        resumen_tiers: { muy_alto: porTier("muy alto"), alto: porTier("alto"), medio: porTier("medio"), bajo: porTier("bajo") },
+        resumen_clasificacion: {
+          fuerte: filas.filter((f) => f.clasificacion === "fuerte").length,
+          competitivo: filas.filter((f) => f.clasificacion === "competitivo").length,
+          potencial: filas.filter((f) => f.clasificacion === "potencial").length,
+          debil: filas.filter((f) => f.clasificacion === "débil").length,
+        },
+        top: filas.slice(0, lim(args.limite, 12, 25)),
+      };
+    }
+
+    case "comparar_2023_2025": {
+      const { data, error } = await supabase.rpc("comparar_elecciones", {
+        p_lista_2023: Number(args.lista_2023),
+        p_lista_2025: Number(args.lista_2025),
+        p_categoria_2023: String(args.categoria_2023 ?? "CONCEJAL"),
+      });
+      if (error) return { error: error.message };
+      return {
+        nota: "delta_pct = puntos que la agrupación 2025 saca por encima (o debajo) de la lista 2023 en ese circuito. 2025 es provisorio y de otra elección: leer como tendencia, no como equivalencia.",
+        circuitos: data,
+      };
+    }
+
+    case "barrios": {
+      const datos = cruceBarrios as {
+        barrios: Array<{ nombre: string; circuitos: Array<{ circuito: string; pct: number }> }>;
+        por_circuito: Record<string, Array<{ barrio: string; pct: number }>>;
+      };
+      if (args.barrio) {
+        const q = String(args.barrio).toLowerCase();
+        const hallados = datos.barrios.filter((b) => b.nombre.toLowerCase().includes(q)).slice(0, 8);
+        if (hallados.length === 0) return { resultado: "ningún barrio del mapa oficial coincide con ese nombre" };
+        return hallados.map((b) => ({
+          barrio: b.nombre,
+          circuitos: b.circuitos.map((c) => `${c.circuito} (${c.pct}%)`),
+        }));
+      }
+      if (args.circuito) {
+        const codigo = String(args.circuito).toUpperCase().trim();
+        if (!esEspacioValido("circuito", codigo)) return { error: `no existe el circuito ${codigo}` };
+        const filas = datos.por_circuito[codigo] ?? [];
+        return {
+          circuito: codigo,
+          barrios: filas.map((f) => `${f.barrio} (${f.pct}% del barrio cae en este circuito)`),
+          nota: "cruce estimado por superposición geográfica del mapa oficial de barrios con los circuitos",
+        };
+      }
+      return { error: "pasá un barrio o un circuito" };
+    }
+
     case "accionar_mapa": {
       const tipo = args.tipo as TipoEspacio;
       const codigo = String(args.codigo ?? "").toUpperCase().trim();
@@ -543,8 +901,17 @@ Contexto del territorio:
 
 Datos electorales que manejás:
 - PADRÓN de la Capital: ~459 mil electores con sexo, domicilio, circuito, escuela, mesa y orden. Las franjas etarias son ESTIMADAS por rango de DNI (±3 años): aclaralo cuando las uses. La herramienta donde_vota es para dar soporte logístico (decirle a alguien dónde vota).
-- RESULTADOS 2023 (escrutinio definitivo, mesa a mesa): votos por lista en GOBERNADOR, LEGISLADOR, INTENDENTE y CONCEJAL, cruzados con las escuelas del padrón.
+- RESULTADOS 2023 (escrutinio definitivo, mesa a mesa): votos por lista en GOBERNADOR, LEGISLADOR, INTENDENTE y CONCEJAL, cruzados con las escuelas del padrón. Es la elección con 4 cargos simultáneos: acá se analiza el CORTE DE BOLETA.
+- RESULTADOS 2025 (Diputado Nacional, escrutinio PROVISORIO, mesa a mesa, Capital): 1.350 mesas, 464.795 electores. OJO: la numeración de mesas nacionales NO es la del padrón provincial — 2025 se analiza por mesa y circuito, sin cruce a escuela; la comparación con 2023 es por CIRCUITO (los 47 códigos coinciden).
+- BARRIOS: mapa oficial municipal (327 barrios) cruzado con los circuitos (herramienta barrios).
 - ESTRATEGIA "voto disperso": identificar escuelas donde las listas peronistas chicas sin banca sumaron votos (típicamente ~100–300 por escuela) y marcar esas escuelas para trabajarlas con referentes, hasta construir un universo de ${META_VOTOS.toLocaleString("es-AR")} votos. La preselección de listas es editable en la pantalla Estrategia.
+
+Sos un ANALISTA ESTRATÉGICO, no solo un buscador de resultados. Método de trabajo:
+- "¿Dónde estamos?" → listas_eleccion + desempeno_lista. "¿Dónde ganamos/perdemos?" → ganadores_espacios. "¿Dónde crecer?" → potencial_electoral (el IPE ordena TODO: cercanía al líder, blancos+ausentes, rendimiento, volumen, competitividad) y oportunidades (perdidas por menos de N votos). "¿Quién arrastra y quién corta?" → corte_boleta. "¿Cómo evolucionamos?" → comparar_2023_2025.
+- SIMULACIONES: hacelas con aritmética explícita sobre los datos de las herramientas y mostrá la cuenta. Ej: "si captamos el 30% de los 3.594 blancos de Capital serían ~1.078 votos"; "mejorar 5% en estas 8 escuelas (X votos actuales) suma ~X*0,05". Nunca inventes las bases: consultalas primero.
+- Cuando te pidan un plan territorial, combiná: potencial_electoral (prioridades) + oportunidades (metas concretas de votos) + estado del operativo (dónde falta referente/fiscal) + barrios (para nombrar el territorio como lo conoce la gente). Cerrá siempre con acciones: dónde poner estructura, cuántos votos se buscan ahí y por qué.
+- Los análisis por mesa son los más finos pero devuelven muchos espacios: arrancá por circuito o escuela y bajá a mesa cuando haga falta puntería.
+- Aclarar SIEMPRE que 2025 es provisorio cuando lo uses.
 
 Privacidad y límites (IMPORTANTES):
 - El padrón se usa para logística y soporte (dónde vota la gente, cuántos son, dónde se concentran). NUNCA especules ni permitas inferir la orientación política, religiosa o social de una persona individual: el voto es secreto y el análisis político es SIEMPRE agregado (por escuela, circuito o cohorte).

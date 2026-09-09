@@ -13,7 +13,13 @@ export type AccionInteligente =
   | { accion: "vista"; vista: "operativo" | "padron" | "escuelas" | "v2023" | "prioridad" }
   | { accion: "filtros_padron"; sexo?: "F" | "M" | "todos"; franja?: string }
   | { accion: "escuelas_min"; minimo: number }
-  | { accion: "escuela"; nombre: string };
+  | { accion: "escuela"; nombre: string }
+  | { accion: "barrio"; nombre: string };
+
+export interface BarrioBuscable {
+  nombre: string;
+  circuitos: Array<{ circuito: string; pct: number }>;
+}
 
 const normalizar = (s: string) =>
   s
@@ -41,11 +47,13 @@ interface ReconocedorVoz {
 export function BusquedaInteligente({
   supabase,
   escuelas,
+  barrios,
   onAccion,
   onAviso,
 }: {
   supabase: SupabaseClient;
   escuelas: Escuela[];
+  barrios: BarrioBuscable[];
   onAccion: (a: AccionInteligente) => void;
   onAviso: (texto: string) => void;
 }) {
@@ -239,6 +247,24 @@ export function BusquedaInteligente({
     }).slice(0, 5);
   }, [q, escuelas, interpretando]);
 
+  // Barrios por nombre (mismo criterio que las escuelas)
+  const sugBarrios = useMemo(() => {
+    const texto = normalizar(q.trim());
+    if (texto.length < 3 || /^\d+$/.test(texto) || interpretando) return [];
+    const tokens = texto.split(/\s+/);
+    return barrios.filter((b) => {
+      const n = normalizar(b.nombre);
+      return tokens.every((t) => n.includes(t));
+    }).slice(0, 5);
+  }, [q, barrios, interpretando]);
+
+  const elegirBarrio = (b: BarrioBuscable) => {
+    setAbierto(false);
+    setElegido(null);
+    setQ("");
+    onAccion({ accion: "barrio", nombre: b.nombre });
+  };
+
   const elegirEspacio = (s: { tipo: TipoEspacio; codigo: string }) => {
     setAbierto(false);
     setElegido(null);
@@ -254,7 +280,9 @@ export function BusquedaInteligente({
     if (e.lat == null) onAviso("Escuela sin ubicación en el mapa: igual se abre su ficha");
   };
 
-  const hayPanel = !elegido && (sugEspacios.length > 0 || sugEscuelas.length > 0 || (abierto && resultados.length > 0));
+  const hayPanel =
+    !elegido &&
+    (sugEspacios.length > 0 || sugEscuelas.length > 0 || sugBarrios.length > 0 || (abierto && resultados.length > 0));
 
   return (
     <div className="pointer-events-auto relative">
@@ -329,9 +357,31 @@ export function BusquedaInteligente({
             </>
           )}
 
+          {sugBarrios.length > 0 && (
+            <>
+              <div className="px-2 pt-1.5 pb-0.5 text-[9px] font-bold tracking-wide text-texto-3 uppercase">
+                Barrios
+              </div>
+              {sugBarrios.map((b) => (
+                <button
+                  key={b.nombre}
+                  onClick={() => elegirBarrio(b)}
+                  className="block w-full rounded-lg px-2 py-1.5 text-left transition hover:bg-panel-3"
+                >
+                  <div className="text-[12px] font-bold">📍 {b.nombre}</div>
+                  <div className="text-[10px] text-texto-3">
+                    {b.circuitos.length === 0
+                      ? "fuera de los circuitos de Capital"
+                      : `circuito${b.circuitos.length === 1 ? "" : "s"} ${b.circuitos.map((c) => c.circuito).join(", ")}`}
+                  </div>
+                </button>
+              ))}
+            </>
+          )}
+
           {abierto && resultados.length > 0 && (
             <>
-              {(sugEspacios.length > 0 || sugEscuelas.length > 0) && (
+              {(sugEspacios.length > 0 || sugEscuelas.length > 0 || sugBarrios.length > 0) && (
                 <div className="px-2 pt-1.5 pb-0.5 text-[9px] font-bold tracking-wide text-texto-3 uppercase">
                   Padrón
                 </div>
