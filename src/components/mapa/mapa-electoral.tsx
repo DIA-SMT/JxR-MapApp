@@ -428,6 +428,30 @@ const capaBarriosLinea = (tema: Tema): LayerProps => ({
     "line-dasharray": [2, 2],
   },
 });
+/** Barrio resaltado: el que se eligió desde el panel del circuito. */
+const capaBarrioResaltadoRelleno = (nombre: string): LayerProps => ({
+  id: "barrio-resaltado-relleno",
+  type: "fill",
+  source: "barrios",
+  filter: ["==", ["get", "nombre"], nombre],
+  paint: { "fill-color": "#f2c94c", "fill-opacity": 0.22 },
+});
+const capaBarrioResaltadoLinea = (nombre: string): LayerProps => ({
+  id: "barrio-resaltado-linea",
+  type: "line",
+  source: "barrios",
+  filter: ["==", ["get", "nombre"], nombre],
+  layout: { "line-cap": "round", "line-join": "round" },
+  paint: { "line-color": "#f2c94c", "line-width": 3, "line-opacity": 0.95 },
+});
+const capaBarrioResaltadoGlow = (nombre: string): LayerProps => ({
+  id: "barrio-resaltado-glow",
+  type: "line",
+  source: "barrios",
+  filter: ["==", ["get", "nombre"], nombre],
+  paint: { "line-color": "#f2c94c", "line-width": 12, "line-blur": 7, "line-opacity": 0.45 },
+});
+
 const capaBarriosNombre = (tema: Tema): LayerProps => ({
   id: "barrios-nombre",
   type: "symbol",
@@ -594,6 +618,7 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
   const [verAvenidas, setVerAvenidas] = useState(true);
   const [verCalles, setVerCalles] = useState(true);
   const [verBarrios, setVerBarrios] = useState(false);
+  const [barrioResaltado, setBarrioResaltado] = useState<string | null>(null);
   const [hayAnclaEtiquetas, setHayAnclaEtiquetas] = useState(true);
   const [aviso, setAviso] = useState<string | null>(null);
   const [usuarioId, setUsuarioId] = useState<string | null>(null);
@@ -777,6 +802,12 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
   const circuitos = useMemo(() => enriquecer(circuitosGeo, "circuito"), [circuitosGeo, porEspacio, padronCirc, votos2023, huerfanosCirc]);
   const geoPorTipo: Record<TipoEspacio, FCPoligono | null> = { distrito: distritos, circuito: circuitos };
 
+  /** Escuelas con coordenadas: las que se pueden marcar en el mapa. */
+  const escuelasUbicadas = useMemo(
+    () => new Set(escuelas.filter((e) => e.lat != null && e.lon != null).map((e) => e.nombre)),
+    [escuelas],
+  );
+
   const maxElectores = useMemo(() => Math.max(1, ...padronCirc.values()), [padronCirc]);
   const maxVotos2023 = useMemo(() => Math.max(1, ...(votos2023?.values() ?? [1])), [votos2023]);
 
@@ -862,24 +893,61 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
         }
         break;
       }
-      case "barrio": {
-        const b = BARRIOS.find((x) => x.nombre === a.nombre);
-        if (!b) break;
-        setVerBarrios(true);
-        const mapa = mapRef.current?.getMap();
-        mapa?.fitBounds([[b.bbox[0], b.bbox[1]], [b.bbox[2], b.bbox[3]]], {
-          padding: 120,
-          maxZoom: 15,
-          duration: 900,
-        });
-        avisar(
-          `Barrio ${b.nombre} · circuito${b.circuitos.length === 1 ? "" : "s"} ${b.circuitos.map((c) => `${c.circuito} (${c.pct}%)`).join(", ")}`,
-        );
+      case "barrio":
+        verBarrioRef.current(a.nombre);
         break;
-      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * Resalta un barrio y lo encuadra (lo llama la búsqueda y también los chips
+   * de barrios del panel del circuito). Prende la capa de barrios si estaba
+   * apagada, así el resaltado siempre se ve.
+   */
+  const verBarrio = useCallback(
+    (nombre: string) => {
+      const b = BARRIOS.find((x) => x.nombre === nombre);
+      if (!b) {
+        avisar(`El barrio ${nombre} no está en el mapa oficial`);
+        return;
+      }
+      setVerBarrios(true);
+      setBarrioResaltado((actual) => (actual === nombre ? null : nombre));
+      const mapa = mapRef.current?.getMap();
+      mapa?.fitBounds([[b.bbox[0], b.bbox[1]], [b.bbox[2], b.bbox[3]]], {
+        padding: { top: 90, bottom: 60, left: 60, right: 440 },
+        maxZoom: 15.5,
+        duration: 900,
+      });
+      avisar(
+        `Barrio ${b.nombre} · circuito${b.circuitos.length === 1 ? "" : "s"} ${b.circuitos.map((c) => `${c.circuito} (${c.pct}%)`).join(", ")}`,
+      );
+    },
+    [avisar],
+  );
+  const verBarrioRef = useRef(verBarrio);
+  verBarrioRef.current = verBarrio;
+
+  /** Abre la ficha de una escuela por nombre y la encuadra si tiene ubicación. */
+  const verEscuela = useCallback(
+    (nombre: string) => {
+      const esc = escuelasRef.current.find((x) => x.nombre === nombre);
+      if (!esc) {
+        avisar(`No encuentro la escuela ${nombre}`);
+        return;
+      }
+      setSeleccion(null);
+      setEscuelaSel(esc);
+      const mapa = mapRef.current?.getMap();
+      if (mapa && esc.lon != null && esc.lat != null) {
+        mapa.easeTo({ center: [esc.lon - 0.004, esc.lat], zoom: Math.max(mapa.getZoom(), 14.5), duration: 800 });
+      } else {
+        avisar(`${esc.nombre} todavía no tiene ubicación en el mapa: se abre su ficha igual`);
+      }
+    },
+    [avisar],
+  );
 
   const alternar3D = () => {
     const mapa = mapRef.current?.getMap();
@@ -1076,13 +1144,11 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
           </Source>
         )}
 
-        {verAvenidas && (
-          <>
-            <Layer {...capaAvenidasBrillo} />
-            <Layer {...capaAvenidas} />
-            <Layer {...capaAvenidasNombre(tema)} />
-          </>
-        )}
+        {/* Cada Layer va suelto: react-map-gl clona los hijos del mapa para
+            pasarles el contexto y a un Fragment no se le pueden pasar props. */}
+        {verAvenidas && <Layer {...capaAvenidasBrillo} />}
+        {verAvenidas && <Layer {...capaAvenidas} />}
+        {verAvenidas && <Layer {...capaAvenidasNombre(tema)} />}
 
         {/* La capa activa se monta al final para dibujarse encima del contexto */}
         {([tipoContexto, tipoActivo] as const).map((tipo) => {
@@ -1127,6 +1193,11 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
           <Source id="barrios" type="geojson" data={barriosGeo}>
             {/* key con tipoActivo/ver3D: remonta la capa arriba cuando el territorio se remonta */}
             <Layer key={`barrios-linea-${tipoActivo}-${ver3D}`} {...capaBarriosLinea(tema)} />
+            {/* Sin Fragment: react-map-gl clona los hijos del Source para pasarles
+                el mapa, y a un Fragment no se le pueden pasar props. */}
+            {barrioResaltado && <Layer key={`barrio-glow-${barrioResaltado}`} {...capaBarrioResaltadoGlow(barrioResaltado)} />}
+            {barrioResaltado && <Layer key={`barrio-relleno-${barrioResaltado}`} {...capaBarrioResaltadoRelleno(barrioResaltado)} />}
+            {barrioResaltado && <Layer key={`barrio-linea-${barrioResaltado}`} {...capaBarrioResaltadoLinea(barrioResaltado)} />}
             <Layer key={`barrios-nombre-${tipoActivo}-${ver3D}`} {...capaBarriosNombre(tema)} />
           </Source>
         )}
@@ -1482,7 +1553,14 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
           seleccion={seleccion}
           resumen={resumenSeleccion ?? null}
           territorio={territorio}
-          onCerrar={() => setSeleccion(null)}
+          escuelasUbicadas={escuelasUbicadas}
+          barrioResaltado={barrioResaltado}
+          onVerBarrio={verBarrio}
+          onVerEscuela={verEscuela}
+          onCerrar={() => {
+            setSeleccion(null);
+            setBarrioResaltado(null);
+          }}
         />
       )}
     </div>

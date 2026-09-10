@@ -43,11 +43,20 @@ export function PanelEspacio({
   seleccion,
   resumen,
   territorio,
+  escuelasUbicadas,
+  barrioResaltado,
+  onVerBarrio,
+  onVerEscuela,
   onCerrar,
 }: {
   seleccion: SeleccionEspacio;
   resumen: ResumenEspacio | null;
   territorio: ReturnType<typeof useTerritorio>;
+  /** Nombres de escuelas con coordenadas: las que se pueden marcar en el mapa. */
+  escuelasUbicadas?: Set<string>;
+  barrioResaltado?: string | null;
+  onVerBarrio?: (nombre: string) => void;
+  onVerEscuela?: (nombre: string) => void;
   onCerrar: () => void;
 }) {
   const { supabase, personas, tareas, recargar } = territorio;
@@ -299,15 +308,30 @@ export function PanelEspacio({
               <School size={11} /> {padron.escuelas.length} escuelas de votación {verEscuelas ? "▴" : "▾"}
             </button>
             {verEscuelas && (
-              <div className="mt-1.5 max-h-40 space-y-1 overflow-y-auto">
-                {padron.escuelas.map((e) => (
-                  <div key={e.nombre} className="rounded-lg bg-panel px-2 py-1.5 text-[10px]">
-                    <div className="font-semibold">{e.nombre}</div>
-                    <div className="text-texto-3">
-                      {numero(e.electores)} electores{e.mesas ? ` · ${e.mesas} mesas` : ""}
-                    </div>
-                  </div>
-                ))}
+              <div className="mt-1.5 max-h-48 space-y-1 overflow-y-auto">
+                {padron.escuelas.map((e) => {
+                  const ubicada = escuelasUbicadas ? escuelasUbicadas.has(e.nombre) : true;
+                  return (
+                    <button
+                      key={e.nombre}
+                      onClick={() => onVerEscuela?.(e.nombre)}
+                      disabled={!onVerEscuela}
+                      className="block w-full rounded-lg bg-panel px-2 py-1.5 text-left text-[10px] transition hover:bg-panel-3 disabled:cursor-default"
+                      title={ubicada ? "Abrir su ficha y marcarla en el mapa" : "Sin ubicación en el mapa: abre la ficha igual"}
+                    >
+                      <div className="flex items-start gap-1.5">
+                        <span className="shrink-0">{ubicada ? "🏫" : "📋"}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="font-semibold">{e.nombre}</span>
+                          <span className="block text-texto-3">
+                            {numero(e.electores)} electores{e.mesas ? ` · ${e.mesas} mesas` : ""}
+                            {!ubicada && " · sin ubicación"}
+                          </span>
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
 
@@ -508,17 +532,32 @@ export function PanelEspacio({
               <span>{verBarrios ? "▴" : "▾"}</span>
             </button>
             {verBarrios && (
-              <div className="mt-2 flex max-h-36 flex-wrap gap-1 overflow-y-auto">
-                {barriosDelCircuito.map((b) => (
-                  <span
-                    key={b.barrio}
-                    className="rounded-full border border-borde-2 px-2 py-0.5 text-[10px] text-texto-2"
-                    title={`${b.pct}% del barrio cae en este circuito`}
-                  >
-                    {b.barrio}{b.pct < 50 ? ` (${b.pct}%)` : ""}
-                  </span>
-                ))}
-              </div>
+              <>
+                <div className="mt-2 flex max-h-40 flex-wrap gap-1 overflow-y-auto">
+                  {barriosDelCircuito.map((b) => {
+                    const activo = barrioResaltado === b.barrio;
+                    return (
+                      <button
+                        key={b.barrio}
+                        onClick={() => onVerBarrio?.(b.barrio)}
+                        disabled={!onVerBarrio}
+                        className={`rounded-full border px-2 py-0.5 text-[10px] transition disabled:cursor-default ${
+                          activo
+                            ? "border-amarillo bg-amarillo/20 font-bold text-amarillo"
+                            : "border-borde-2 text-texto-2 hover:border-amarillo/60 hover:text-texto"
+                        }`}
+                        title={`${b.pct}% del barrio cae en este circuito · clic para marcarlo en el mapa`}
+                      >
+                        {b.barrio}
+                        {b.pct < 50 ? ` (${b.pct}%)` : ""}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-1 text-[9px] text-texto-3">
+                  Clic en un barrio para marcarlo en el mapa (volvé a tocarlo para quitar la marca).
+                </p>
+              </>
             )}
           </div>
         )}
