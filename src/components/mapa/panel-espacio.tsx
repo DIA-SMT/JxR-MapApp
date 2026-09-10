@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Plus, School, Search, Sparkles, Square, Trash2, UserPlus, Vote, X } from "lucide-react";
+import { Check, Plus, School, Search, Sparkles, Square, Trash2, UserPlus, Users2, Vote, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { etiquetaEspacio } from "@/lib/espacios";
 import {
@@ -14,10 +14,12 @@ import {
 import {
   armarMesasPeleadas,
   obtenerMesas2025Circuito,
+  obtenerPerfilSocial,
   obtenerRankingCircuito,
   obtenerVotos2025Circuito,
   type FilaRankingEspacio,
   type MesaPeleada,
+  type PerfilSocial,
 } from "@/lib/analisis";
 import cruceBarrios from "@/lib/datos/barrios-circuitos.json";
 import type { ResumenEspacio, useTerritorio } from "@/lib/territorio";
@@ -90,6 +92,10 @@ export function PanelEspacio({
   const [ver2025, setVer2025] = useState(false);
   const [verMesas25, setVerMesas25] = useState(false);
   const [verBarrios, setVerBarrios] = useState(false);
+  // Perfil social del circuito (Censo 2022) + el de la ciudad para comparar
+  const [perfil, setPerfil] = useState<PerfilSocial | null>(null);
+  const [perfilCiudad, setPerfilCiudad] = useState<PerfilSocial | null>(null);
+  const [verPerfil, setVerPerfil] = useState(false);
   useEffect(() => {
     setPadron(null);
     setElectores([]);
@@ -103,8 +109,13 @@ export function PanelEspacio({
     setVer2025(false);
     setVerMesas25(false);
     setVerBarrios(false);
+    setPerfil(null);
+    setVerPerfil(false);
     if (seleccion.tipo !== "circuito") return;
     const vivo = { actual: true };
+    void obtenerPerfilSocial(supabase, "circuito", seleccion.codigo)
+      .then((p) => vivo.actual && setPerfil(p))
+      .catch(() => {});
     void obtenerPadronDeCircuito(supabase, seleccion.codigo).then((d) => vivo.actual && setPadron(d));
     void obtenerResumen2023Circuito(supabase, seleccion.codigo, "CONCEJAL").then((d) => vivo.actual && setR2023(d));
     void obtenerRankingCircuito(supabase, "2025", seleccion.codigo).then((d) => vivo.actual && setR2025(d));
@@ -124,6 +135,11 @@ export function PanelEspacio({
       vivo.actual = false;
     };
   }, [supabase, seleccion.tipo, seleccion.codigo]);
+
+  // El promedio de la ciudad se pide una sola vez: es la referencia fija
+  useEffect(() => {
+    void obtenerPerfilSocial(supabase, "ciudad", null).then(setPerfilCiudad).catch(() => {});
+  }, [supabase]);
 
   const barriosDelCircuito = seleccion.tipo === "circuito" ? (BARRIOS_POR_CIRCUITO[seleccion.codigo] ?? []) : [];
 
@@ -517,6 +533,122 @@ export function PanelEspacio({
                   </div>
                 )}
               </>
+            )}
+          </div>
+        )}
+
+        {/* ── Perfil social del circuito (Censo 2022) ── */}
+        {seleccion.tipo === "circuito" && perfil && (
+          <div className="rounded-xl border border-borde bg-panel-2/70 p-3">
+            <button
+              onClick={() => setVerPerfil((v) => !v)}
+              className="flex w-full items-center justify-between text-[11px] font-bold tracking-wide text-texto-2 uppercase"
+            >
+              <span className="flex items-center gap-1.5">
+                <Users2 size={12} className="text-celeste" /> Perfil social
+                <span className="font-normal normal-case text-texto-3">(Censo 2022)</span>
+              </span>
+              <span>{verPerfil ? "▴" : "▾"}</span>
+            </button>
+
+            <div className="mt-1 text-[11px] text-texto-2">
+              <b className="num text-texto">{numero(perfil.poblacion)}</b> habitantes ·{" "}
+              <b className="num text-texto">{numero(perfil.hogares)}</b> hogares
+              {perfil.edad.pct_65_y_mas != null && (
+                <>
+                  {" · "}
+                  <b className="num text-texto">{perfil.edad.pct_65_y_mas}%</b> de 65+
+                </>
+              )}
+            </div>
+
+            {/* Los 4 indicadores que más mueven la estrategia, contra la ciudad */}
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
+              {(
+                [
+                  ["Desocupación", perfil.trabajo.tasa_desocupacion, perfilCiudad?.trabajo.tasa_desocupacion ?? null],
+                  ["Hogares con NBI", perfil.pobreza.pct_nbi, perfilCiudad?.pobreza.pct_nbi ?? null],
+                  ["Sin cloaca", perfil.servicios.pct_sin_cloaca, perfilCiudad?.servicios.pct_sin_cloaca ?? null],
+                  ["Sin cobertura de salud", perfil.educacion_salud.pct_sin_cobertura, perfilCiudad?.educacion_salud.pct_sin_cobertura ?? null],
+                ] as Array<[string, number | null, number | null]>
+              ).map(([etiqueta, valor, ciudad]) => {
+                if (valor == null) return null;
+                // Peor que la ciudad = oportunidad de agenda concreta en la zona
+                const peor = ciudad != null && valor > ciudad * 1.15;
+                const mejor = ciudad != null && valor < ciudad * 0.85;
+                return (
+                  <div key={etiqueta} className="rounded-lg bg-panel px-2 py-1.5">
+                    <div className="text-[9px] text-texto-3">{etiqueta}</div>
+                    <div className="flex items-baseline gap-1">
+                      <span className={`num text-sm font-bold ${peor ? "text-sin" : mejor ? "text-completo" : "text-texto"}`}>
+                        {valor}%
+                      </span>
+                      {ciudad != null && (
+                        <span className="text-[9px] text-texto-3" title="Promedio de la ciudad">
+                          ciudad {ciudad}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {verPerfil && (
+              <div className="mt-2 space-y-2 border-t border-borde pt-2 text-[10px]">
+                <div>
+                  <div className="mb-0.5 font-bold tracking-wide text-texto-3 uppercase">Cómo trabaja la gente</div>
+                  <div className="flex flex-wrap gap-1">
+                    {(
+                      [
+                        ["en relación de dependencia", perfil.trabajo.en_relacion_de_dependencia],
+                        ["por cuenta propia", perfil.trabajo.cuenta_propia],
+                        ["empleo público / educación y salud pública", perfil.trabajo.empleo_publico_o_educacion_salud_publica],
+                        ["comercio", perfil.trabajo.comercio],
+                        ["construcción", perfil.trabajo.construccion],
+                        ["servicio doméstico", perfil.trabajo.servicio_domestico],
+                        ["patrón o empleador", perfil.trabajo.patron_o_empleador],
+                      ] as Array<[string, number]>
+                    )
+                      .filter(([, n]) => n > 0)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([etiqueta, n]) => (
+                        <span key={etiqueta} className="rounded-full border border-borde-2 px-2 py-0.5">
+                          <b className="num">{numero(n)}</b> {etiqueta}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-0.5 font-bold tracking-wide text-texto-3 uppercase">Condiciones de vida</div>
+                  <div className="flex flex-wrap gap-1">
+                    {perfil.pobreza.pct_hacinamiento != null && (
+                      <span className="rounded-full border border-borde-2 px-2 py-0.5">
+                        hacinamiento <b className="num">{perfil.pobreza.pct_hacinamiento}%</b>
+                      </span>
+                    )}
+                    {perfil.pobreza.pct_privacion != null && (
+                      <span className="rounded-full border border-borde-2 px-2 py-0.5">
+                        con privación <b className="num">{perfil.pobreza.pct_privacion}%</b>
+                      </span>
+                    )}
+                    {perfil.servicios.pct_sin_agua_de_red != null && (
+                      <span className="rounded-full border border-borde-2 px-2 py-0.5">
+                        sin agua de red <b className="num">{perfil.servicios.pct_sin_agua_de_red}%</b>
+                      </span>
+                    )}
+                    {perfil.educacion_salud.pct_clima_educativo_bajo != null && (
+                      <span className="rounded-full border border-borde-2 px-2 py-0.5">
+                        clima educativo bajo <b className="num">{perfil.educacion_salud.pct_clima_educativo_bajo}%</b>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <p className="text-[9px] text-texto-3">
+                  Censo 2022 (INDEC) sobre {perfil.radios_censales} radios censales, ponderados por la parte de cada
+                  radio que cae en el circuito. Describe el contexto social de la zona, no a personas concretas.
+                </p>
+              </div>
             )}
           </div>
         )}

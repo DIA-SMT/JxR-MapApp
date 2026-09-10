@@ -7,6 +7,67 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * numeración de mesas nacionales no es la del padrón provincial).
  */
 
+// ── Perfil social (Censo 2022 por radio censal) ─────────────────────────────
+
+export interface PerfilSocial {
+  nivel: string;
+  codigo: string | null;
+  radios_censales: number;
+  poblacion: number;
+  hogares: number;
+  edad: { hasta_14: number; de_15_a_64: number; de_65_y_mas: number; pct_65_y_mas: number | null };
+  pobreza: {
+    hogares_nbi: number;
+    pct_nbi: number | null;
+    hogares_con_privacion: number;
+    pct_privacion: number | null;
+    hogares_hacinados: number;
+    pct_hacinamiento: number | null;
+  };
+  servicios: {
+    hogares_sin_cloaca: number;
+    pct_sin_cloaca: number | null;
+    hogares_sin_agua_de_red: number;
+    pct_sin_agua_de_red: number | null;
+  };
+  trabajo: {
+    ocupados: number;
+    desocupados: number;
+    inactivos: number;
+    tasa_desocupacion: number | null;
+    en_relacion_de_dependencia: number;
+    cuenta_propia: number;
+    servicio_domestico: number;
+    patron_o_empleador: number;
+    empleo_publico_o_educacion_salud_publica: number;
+    comercio: number;
+    construccion: number;
+  };
+  educacion_salud: {
+    secundario_completo_o_mas: number;
+    hogares_clima_educativo_bajo: number;
+    pct_clima_educativo_bajo: number | null;
+    sin_cobertura_de_salud: number;
+    pct_sin_cobertura: number | null;
+  };
+  fuente: string;
+}
+
+/** Perfil socioeconómico de un circuito, un barrio o toda la ciudad. */
+export async function obtenerPerfilSocial(
+  supabase: SupabaseClient,
+  nivel: "circuito" | "barrio" | "ciudad",
+  codigo: string | null,
+): Promise<PerfilSocial | null> {
+  const { data, error } = await supabase.rpc("perfil_social", {
+    p_nivel: nivel,
+    p_codigo: nivel === "ciudad" ? null : codigo,
+  });
+  if (error) throw new Error(error.message);
+  const p = data as PerfilSocial | null;
+  return p && p.poblacion > 0 ? p : null;
+}
+
 // ── Universos de listas (estrategia 2027) ───────────────────────────────────
 
 export type NivelTerritorial = "barrio" | "circuito" | "escuela" | "mesa";

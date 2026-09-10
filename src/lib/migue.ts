@@ -365,6 +365,42 @@ export const HERRAMIENTAS_MIGUE = [
   {
     type: "function",
     function: {
+      name: "perfil_social",
+      description:
+        "PERFIL SOCIAL de un circuito, un barrio o toda la ciudad (Censo 2022 del INDEC por radio censal): población y edades, pobreza (NBI, privación, hacinamiento), servicios (sin cloaca, sin agua de red), TRABAJO (ocupados, desocupados y tasa, relación de dependencia, cuenta propia, servicio doméstico, empleo público, comercio, construcción), educación y cobertura de salud. Usala para cruzar el voto con el contexto social: qué perfil tiene la gente que vive en una zona y qué demandas es razonable que tenga. Compará siempre contra la ciudad (nivel 'ciudad') para saber si la zona está mejor o peor que el promedio.",
+      parameters: {
+        type: "object",
+        properties: {
+          nivel: { type: "string", enum: ["circuito", "barrio", "ciudad"] },
+          codigo: { type: "string", description: "'15B' para circuito, el nombre para barrio; omitir con nivel ciudad" },
+        },
+        required: ["nivel"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ranking_social",
+      description:
+        "Ranking de circuitos o barrios por un indicador social del Censo 2022: dónde hay más NBI, más hacinamiento, más desocupación, más hogares sin cloaca, peor clima educativo, más gente sin cobertura de salud o más adultos mayores. Sirve para priorizar territorio por necesidad y para elegir el mensaje adecuado a cada zona.",
+      parameters: {
+        type: "object",
+        properties: {
+          nivel: { type: "string", enum: ["circuito", "barrio"] },
+          indicador: {
+            type: "string",
+            enum: ["pct_nbi", "pct_privacion", "pct_hacinamiento", "pct_sin_cloaca", "tasa_desocupacion", "pct_clima_educativo_bajo", "pct_sin_cobertura", "pct_65_y_mas"],
+          },
+          limite: { type: "number", description: "máx 25" },
+        },
+        required: ["nivel", "indicador"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "barrios",
       description:
         "Cruce BARRIO ↔ CIRCUITO (mapa oficial municipal, 327 barrios): con barrio → a qué circuito(s) pertenece y en qué proporción; con circuito → qué barrios lo componen. Sirve para traducir el análisis electoral a territorio concreto.",
@@ -845,6 +881,42 @@ export async function ejecutarHerramientaMigue(
       };
     }
 
+    case "perfil_social": {
+      const nivel = String(args.nivel ?? "circuito");
+      const codigo = args.codigo ? String(args.codigo).trim() : null;
+      if (nivel === "circuito" && codigo && !esEspacioValido("circuito", codigo.toUpperCase())) {
+        return { error: `no existe el circuito ${codigo}` };
+      }
+      const { data, error } = await supabase.rpc("perfil_social", {
+        p_nivel: nivel,
+        p_codigo: nivel === "ciudad" ? null : codigo,
+      });
+      if (error) return { error: error.message };
+      const r = data as { poblacion: number } | null;
+      if (!r || !r.poblacion) {
+        return { error: `sin datos censales para ${nivel} ${codigo ?? ""} (revisá el nombre exacto)` };
+      }
+      return {
+        ...data,
+        nota: "Censo 2022 (INDEC), agregado por radio censal: describe el CONTEXTO SOCIAL de la zona, no a personas concretas ni su voto",
+      };
+    }
+
+    case "ranking_social": {
+      const { data, error } = await supabase.rpc("ranking_social", {
+        p_nivel: String(args.nivel ?? "circuito"),
+        p_indicador: String(args.indicador ?? "pct_nbi"),
+        p_limite: lim(args.limite, 12, 25),
+      });
+      if (error) return { error: error.message };
+      return {
+        indicador: args.indicador,
+        nivel: args.nivel,
+        nota: "ordenado de mayor a menor; fuente Censo 2022 por radio censal",
+        top: data,
+      };
+    }
+
     case "barrios": {
       const datos = cruceBarrios as {
         barrios: Array<{ nombre: string; circuitos: Array<{ circuito: string; pct: number }> }>;
@@ -904,12 +976,15 @@ Datos electorales que manejás:
 - RESULTADOS 2023 (escrutinio definitivo, mesa a mesa): votos por lista en GOBERNADOR, LEGISLADOR, INTENDENTE y CONCEJAL, cruzados con las escuelas del padrón. Es la elección con 4 cargos simultáneos: acá se analiza el CORTE DE BOLETA.
 - RESULTADOS 2025 (Diputado Nacional, escrutinio PROVISORIO, mesa a mesa, Capital): 1.350 mesas, 464.795 electores. OJO: la numeración de mesas nacionales NO es la del padrón provincial — 2025 se analiza por mesa y circuito, sin cruce a escuela; la comparación con 2023 es por CIRCUITO (los 47 códigos coinciden).
 - BARRIOS: mapa oficial municipal (327 barrios) cruzado con los circuitos (herramienta barrios).
+- PERFIL SOCIAL (Censo 2022 del INDEC, 671 radios censales de la Capital): población y edades, NBI, hacinamiento, servicios (cloaca, agua), situación laboral (ocupados, desocupados y tasa, relación de dependencia, cuenta propia, servicio doméstico, empleo público, comercio, construcción), clima educativo y cobertura de salud — por circuito, por barrio y de toda la ciudad. Referencias de la ciudad para comparar: NBI 7,7% · hacinamiento 14,6% · sin cloaca 14,1% · desocupación 10,7% · sin cobertura de salud 29,9%.
 - ESTRATEGIA "voto disperso": identificar escuelas donde las listas peronistas chicas sin banca sumaron votos (típicamente ~100–300 por escuela) y marcar esas escuelas para trabajarlas con referentes, hasta construir un universo de ${META_VOTOS.toLocaleString("es-AR")} votos. La preselección de listas es editable en la pantalla Estrategia.
 
 Sos un ANALISTA ESTRATÉGICO, no solo un buscador de resultados. Método de trabajo:
 - "¿Dónde estamos?" → listas_eleccion + desempeno_lista. "¿Dónde ganamos/perdemos?" → ganadores_espacios. "¿Dónde crecer?" → potencial_electoral (el IPE ordena TODO: cercanía al líder, blancos+ausentes, rendimiento, volumen, competitividad) y oportunidades (perdidas por menos de N votos). "¿Quién arrastra y quién corta?" → corte_boleta. "¿Cómo evolucionamos?" → comparar_2023_2025.
 - SIMULACIONES: hacelas con aritmética explícita sobre los datos de las herramientas y mostrá la cuenta. Ej: "si captamos el 30% de los 3.594 blancos de Capital serían ~1.078 votos"; "mejorar 5% en estas 8 escuelas (X votos actuales) suma ~X*0,05". Nunca inventes las bases: consultalas primero.
-- Cuando te pidan un plan territorial, combiná: potencial_electoral (prioridades) + oportunidades (metas concretas de votos) + estado del operativo (dónde falta referente/fiscal) + barrios (para nombrar el territorio como lo conoce la gente). Cerrá siempre con acciones: dónde poner estructura, cuántos votos se buscan ahí y por qué.
+- Cuando te pidan un plan territorial, combiná: potencial_electoral (prioridades) + oportunidades (metas concretas de votos) + estado del operativo (dónde falta referente/fiscal) + barrios (para nombrar el territorio como lo conoce la gente) + perfil_social (qué perfil tiene la gente de esa zona). Cerrá siempre con acciones: dónde poner estructura, cuántos votos se buscan ahí y por qué.
+- VOTO + PERFIL SOCIAL: cuando cruces ambos, el perfil social sirve para elegir el MENSAJE y la PROPUESTA de cada territorio, no para predecir el voto de nadie. Ej: una zona con desocupación muy por encima del 10,7% de la ciudad y clima educativo bajo pide agenda de trabajo y oficios; una con muchos adultos mayores pide salud y previsión; una con hogares sin cloaca pide infraestructura. Siempre comparás el dato de la zona contra el de la ciudad para decir si está mejor o peor, y decís de qué indicador surge la conclusión.
+- Lo que el censo NO dice: cómo vota una persona, ni su problemática individual. Si te piden ese cruce a nivel individuo, explicá que el análisis es por zona y ofrecé el agregado.
 - Los análisis por mesa son los más finos pero devuelven muchos espacios: arrancá por circuito o escuela y bajá a mesa cuando haga falta puntería.
 - Si preguntan por una MESA puntual sin aclarar la elección, asumí 2025 (los paneles de la app muestran las mesas nacionales 2025) y aclaralo en una frase; ofrecé el 2023 como opción solo después de responder. «Dar vuelta» una mesa o circuito = que el 2º supere al 1º: respondé quién gana, quién está segundo y cuántos votos le faltan (diferencia + 1), más blancos y ausentes como bolsa — SIN pedir que te aclaren la agrupación. Regla general: ante ambigüedad, elegí el supuesto más razonable, respondé, y al final aclarás qué asumiste — NUNCA frenes el análisis para repreguntar.
 - Aclarar SIEMPRE que 2025 es provisorio cuando lo uses.
