@@ -1,7 +1,7 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import { Box, Building2, Check, Info, Layers, Route, Satellite, Waypoints, X } from "lucide-react";
+import { Box, Building2, Check, Info, Layers, Route, Satellite, Sparkles, Waypoints, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Layer,
@@ -29,7 +29,15 @@ import {
   type ResumenPadron,
 } from "@/lib/padron";
 import { META_VOTOS, resolverSeleccion } from "@/lib/estrategia";
-import type { TipoEspacio } from "@/lib/tipos";
+import {
+  calcularOportunidades,
+  compararListasCircuitos,
+  listarListasEleccion,
+  type DeltaCircuito,
+  type ListaEleccion,
+  type OportunidadCircuito,
+} from "@/lib/analisis";
+import type { AccionMapaElena, TipoEspacio } from "@/lib/tipos";
 import { BusquedaInteligente, type AccionInteligente } from "./busqueda-inteligente";
 import { PanelEscuela } from "./panel-escuela";
 import { PanelEspacio } from "./panel-espacio";
@@ -93,6 +101,8 @@ const VISTAS = {
   escuelas: { etiqueta: "Escuelas", descripcion: "Escuelas de votación: dónde se concentra el electorado (clic en una escuela = sus datos y resultados)" },
   v2023: { etiqueta: "2023", descripcion: "Voto disperso 2023 (Concejal) por circuito, según la selección de listas de Estrategia" },
   prioridad: { etiqueta: "Prioridad", descripcion: "Frontera 20K: dónde actuar primero — escuelas por tier de prioridad y votos huérfanos (dispersos sin referente) por circuito" },
+  oportunidad: { etiqueta: "Oportunidad", descripcion: "Índice de Oportunidad 0-100 por circuito: 40% voto disperso 2023 + 35% bolsa 2025 (blancos y ausentes) + 25% competitividad 2025" },
+  evolucion: { etiqueta: "2023↔2025", descripcion: "Evolución por circuito: puntos que una agrupación 2025 saca por encima (verde) o debajo (rojo) de una lista 2023 — elegí ambas abajo" },
 } as const;
 type Vista = keyof typeof VISTAS;
 
@@ -257,9 +267,16 @@ const capaLinea = (tipo: TipoEspacio, activa: boolean, tema: Tema): LayerProps =
   },
 });
 
-const capaNombre = (tipo: TipoEspacio, vista: Vista, tema: Tema): LayerProps => {
+const capaNombre = (tipo: TipoEspacio, vista: Vista, tema: Tema, elenaPinta = false): LayerProps => {
   let campo: unknown;
-  if (tipo === "distrito") {
+  if (elenaPinta && tipo === "circuito") {
+    campo = [
+      "case",
+      ["!=", ["coalesce", ["get", "elenaValor"], -99999], -99999],
+      ["concat", "Circuito ", ["get", "codigo"], "\n", ["to-string", ["get", "elenaValor"]]],
+      ["concat", "Circuito ", ["get", "codigo"]],
+    ];
+  } else if (tipo === "distrito") {
     campo = [
       "case",
       [">", ["get", "personas"], 0],
@@ -275,6 +292,23 @@ const capaNombre = (tipo: TipoEspacio, vista: Vista, tema: Tema): LayerProps => 
       "case",
       [">", ["coalesce", ["get", "huerfanos"], 0], 0],
       ["concat", "Circuito ", ["get", "codigo"], "\n", ["to-string", ["get", "huerfanos"]], " huérfanos"],
+      ["concat", "Circuito ", ["get", "codigo"]],
+    ];
+  } else if (vista === "oportunidad") {
+    campo = [
+      "case",
+      ["!=", ["coalesce", ["get", "oportunidad"], -1], -1],
+      ["concat", "Circuito ", ["get", "codigo"], "\nIO ", ["to-string", ["get", "oportunidad"]]],
+      ["concat", "Circuito ", ["get", "codigo"]],
+    ];
+  } else if (vista === "evolucion") {
+    campo = [
+      "case",
+      ["!=", ["coalesce", ["get", "delta"], -99999], -99999],
+      [
+        "concat", "Circuito ", ["get", "codigo"], "\n",
+        ["case", [">=", ["get", "delta"], 0], "+", ""], ["to-string", ["get", "delta"]], " pts",
+      ],
       ["concat", "Circuito ", ["get", "codigo"]],
     ];
   } else if (vista === "escuelas") {
@@ -452,6 +486,64 @@ const capaBarrioResaltadoGlow = (nombre: string): LayerProps => ({
   paint: { "line-color": "#f2c94c", "line-width": 12, "line-blur": 7, "line-opacity": 0.45 },
 });
 
+// ── Capa de Elena: análisis pintado/resaltado desde el chat ──────────────────
+/** Resaltado múltiple: los circuitos que Elena señaló en su análisis. */
+const filtroElena = (circuitos: string[]): FilterSpecification =>
+  ["in", ["get", "codigo"], ["literal", circuitos]] as unknown as FilterSpecification;
+const capaElenaGlow = (circuitos: string[]): LayerProps => ({
+  id: "elena-resaltado-glow",
+  type: "line",
+  source: "circuito",
+  filter: filtroElena(circuitos),
+  paint: { "line-color": "#f2c94c", "line-width": 11, "line-blur": 6, "line-opacity": 0.5 },
+});
+const capaElenaRelleno = (circuitos: string[]): LayerProps => ({
+  id: "elena-resaltado-relleno",
+  type: "fill",
+  source: "circuito",
+  filter: filtroElena(circuitos),
+  paint: { "fill-color": "#f2c94c", "fill-opacity": 0.16 },
+});
+const capaElenaLinea = (circuitos: string[]): LayerProps => ({
+  id: "elena-resaltado-linea",
+  type: "line",
+  source: "circuito",
+  filter: filtroElena(circuitos),
+  layout: { "line-cap": "round", "line-join": "round" },
+  paint: { "line-color": "#f2c94c", "line-width": 3, "line-opacity": 0.95 },
+});
+
+/**
+ * Coropleta por valor arbitrario (lo pintado por Elena, o el delta 2023↔2025).
+ * Con valores negativos se vuelve divergente (rojo ← 0 → verde); si todos son
+ * positivos, la rampa de la casa. Los espacios sin dato quedan casi apagados.
+ */
+const capaCoropletaValor = (tipo: TipoEspacio, prop: string, min: number, max: number, colores: [string, string, string]): LayerProps => {
+  const color =
+    min < 0
+      ? ([
+          "interpolate", ["linear"], ["coalesce", ["get", prop], 0],
+          Math.min(-0.001, min), "#e14f42",
+          0, "#6b7280",
+          Math.max(0.001, max), "#22c55e",
+        ] as never)
+      : ([
+          "interpolate", ["linear"], ["coalesce", ["get", prop], 0],
+          Math.min(0, min), colores[0],
+          min + Math.max(0.001, (max - min) / 2), colores[1],
+          Math.max(min + 0.002, max), colores[2],
+        ] as never);
+  return {
+    id: `${tipo}-relleno`,
+    type: "fill",
+    source: tipo,
+    paint: {
+      "fill-color": color,
+      "fill-opacity": ["case", ["==", ["coalesce", ["get", prop], -99999], -99999], 0.04, 0.6] as never,
+    },
+  };
+};
+
 const capaBarriosNombre = (tema: Tema): LayerProps => ({
   id: "barrios-nombre",
   type: "symbol",
@@ -588,6 +680,8 @@ function bboxDeCoordenadas(c: unknown): [number, number, number, number] {
 }
 
 const numero = (n: number) => n.toLocaleString("es-AR");
+/** Delta con signo explícito: "+3,2" / "-1,8" (el 0 va sin signo). */
+const conSigno = (n: number) => (n > 0 ? `+${numero(n)}` : numero(n));
 
 export interface SeleccionEspacio {
   tipo: TipoEspacio;
@@ -619,6 +713,12 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
   const [verCalles, setVerCalles] = useState(true);
   const [verBarrios, setVerBarrios] = useState(false);
   const [barrioResaltado, setBarrioResaltado] = useState<string | null>(null);
+  /** Análisis de Elena pintado sobre el mapa: resaltado múltiple o coropleta propia. */
+  const [capaElena, setCapaElena] = useState<{
+    etiqueta: string;
+    resaltados: string[] | null;
+    valores: Map<string, number> | null;
+  } | null>(null);
   const [menuCapas, setMenuCapas] = useState(false);
   const [verLeyenda, setVerLeyenda] = useState(true);
 
@@ -692,6 +792,54 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
       setVotos2023(new Map(filas.map((f) => [f.circuito, Number(f.votos)])));
     })();
   }, [vista, votos2023, supabase]);
+
+  // Índice de Oportunidad por circuito (vista Oportunidad)
+  const [oportunidad, setOportunidad] = useState<Map<string, OportunidadCircuito> | null>(null);
+  useEffect(() => {
+    if (vista !== "oportunidad" || oportunidad !== null) return;
+    void (async () => {
+      const listas = await resolverSeleccion(supabase, "CONCEJAL");
+      const filas = await calcularOportunidades(supabase, listas);
+      setOportunidad(new Map(filas.map((f) => [f.circuito, f])));
+    })().catch(() => avisar("No pude calcular el Índice de Oportunidad"));
+  }, [vista, oportunidad, supabase, avisar]);
+  const topOportunidad = useMemo(
+    () => [...(oportunidad?.values() ?? [])].sort((a, b) => b.indice - a.indice).slice(0, 3),
+    [oportunidad],
+  );
+
+  // Evolución 2023 ↔ 2025 (vista 2023↔2025): delta de % por circuito
+  const [listas23, setListas23] = useState<ListaEleccion[] | null>(null);
+  const [listas25, setListas25] = useState<ListaEleccion[] | null>(null);
+  const [sel23, setSel23] = useState<number | null>(null);
+  const [sel25, setSel25] = useState<number | null>(null);
+  const [deltas, setDeltas] = useState<Map<string, DeltaCircuito> | null>(null);
+  useEffect(() => {
+    if (vista !== "evolucion" || listas23 !== null) return;
+    void (async () => {
+      const [l23, l25] = await Promise.all([
+        listarListasEleccion(supabase, "2023", "CONCEJAL"),
+        listarListasEleccion(supabase, "2025"),
+      ]);
+      setListas23(l23);
+      setListas25(l25);
+      // Arranca comparando las dos más votadas: hay algo pintado desde el segundo cero
+      if (l23[0]) setSel23((v) => v ?? l23[0].lista_id);
+      if (l25[0]) setSel25((v) => v ?? l25[0].lista_id);
+    })().catch(() => avisar("No pude cargar las listas para comparar"));
+  }, [vista, listas23, supabase, avisar]);
+  useEffect(() => {
+    if (vista !== "evolucion" || sel23 == null || sel25 == null) return;
+    setDeltas(null);
+    void compararListasCircuitos(supabase, sel23, sel25)
+      .then((filas) => setDeltas(new Map(filas.map((f) => [f.circuito, f]))))
+      .catch(() => avisar("No pude comparar esas listas"));
+  }, [vista, sel23, sel25, supabase, avisar]);
+  const rangoDelta = useMemo(() => {
+    if (!deltas || deltas.size === 0) return null;
+    const v = [...deltas.values()].map((f) => Number(f.delta_pct));
+    return { min: Math.min(...v), max: Math.max(...v) };
+  }, [deltas]);
 
   // Frontera 20K (vista Prioridad): escuelas rankeadas + huérfanos por circuito
   const [prioridad, setPrioridad] = useState<PrioridadEscuela[] | null>(null);
@@ -799,15 +947,18 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
             electores: tipo === "circuito" ? (padronCirc.get(codigo) ?? 0) : 0,
             votos2023: tipo === "circuito" ? (votos2023?.get(codigo) ?? 0) : 0,
             huerfanos: tipo === "circuito" ? (huerfanosCirc.get(codigo) ?? 0) : 0,
+            elenaValor: tipo === "circuito" ? (capaElena?.valores?.get(codigo) ?? null) : null,
+            oportunidad: tipo === "circuito" ? (oportunidad?.get(codigo)?.indice ?? null) : null,
+            delta: tipo === "circuito" ? (deltas?.has(codigo) ? Number(deltas.get(codigo)?.delta_pct) : null) : null,
           },
         };
       }),
     };
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const distritos = useMemo(() => enriquecer(distritosGeo, "distrito"), [distritosGeo, porEspacio, padronCirc, votos2023, huerfanosCirc]);
+  const distritos = useMemo(() => enriquecer(distritosGeo, "distrito"), [distritosGeo, porEspacio, padronCirc, votos2023, huerfanosCirc, capaElena, oportunidad, deltas]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const circuitos = useMemo(() => enriquecer(circuitosGeo, "circuito"), [circuitosGeo, porEspacio, padronCirc, votos2023, huerfanosCirc]);
+  const circuitos = useMemo(() => enriquecer(circuitosGeo, "circuito"), [circuitosGeo, porEspacio, padronCirc, votos2023, huerfanosCirc, capaElena, oportunidad, deltas]);
   const geoPorTipo: Record<TipoEspacio, FCPoligono | null> = { distrito: distritos, circuito: circuitos };
 
   /** Escuelas con coordenadas: las que se pueden marcar en el mapa. */
@@ -858,6 +1009,79 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
   };
   const volarRef = useRef(volarAEspacio);
   volarRef.current = volarAEspacio;
+
+  /** Encuadra el conjunto de circuitos que Elena resaltó o pintó. */
+  const volarACircuitos = (codigos: string[]) => {
+    if (!circuitosGeo || codigos.length === 0) return;
+    const set = new Set(codigos);
+    let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+    for (const f of circuitosGeo.features) {
+      if (!set.has(String(f.properties.circuito))) continue;
+      const [a, b, cc, d] = bboxDeCoordenadas(f.geometry.coordinates);
+      minLon = Math.min(minLon, a); minLat = Math.min(minLat, b);
+      maxLon = Math.max(maxLon, cc); maxLat = Math.max(maxLat, d);
+    }
+    const mapa = mapRef.current?.getMap();
+    if (!mapa || !Number.isFinite(minLon)) return;
+    mapa.fitBounds([[minLon, minLat], [maxLon, maxLat]], {
+      padding: { top: 130, bottom: 60, left: 50, right: 50 },
+      maxZoom: 14.5,
+      duration: 1000,
+    });
+  };
+  const volarACircuitosRef = useRef(volarACircuitos);
+  volarACircuitosRef.current = volarACircuitos;
+
+  /** Aplica las acciones avanzadas de Elena (resaltar / pintar / barrio). */
+  const aplicarAccionesElena = useCallback((acciones: AccionMapaElena[]) => {
+    for (const a of acciones) {
+      if (a.modo === "barrio") {
+        verBarrioRef.current(a.barrio);
+        continue;
+      }
+      setEscuelaSel(null);
+      setTipoActivo("circuito");
+      if (a.modo === "resaltar") {
+        setCapaElena({ etiqueta: a.etiqueta, resaltados: a.circuitos, valores: null });
+        volarACircuitosRef.current(a.circuitos);
+      } else {
+        setCapaElena({
+          etiqueta: a.etiqueta,
+          resaltados: null,
+          valores: new Map(a.valores.map((v) => [v.circuito, v.valor])),
+        });
+        volarACircuitosRef.current(a.valores.map((v) => v.circuito));
+      }
+    }
+  }, []);
+
+  // Elena pinta el mapa: en vivo (evento) o al llegar desde otra pantalla
+  // (sessionStorage: el evento se perdería durante la navegación)
+  useEffect(() => {
+    const alElena = (e: Event) => {
+      const acciones = (e as CustomEvent<AccionMapaElena[]>).detail;
+      if (Array.isArray(acciones)) aplicarAccionesElena(acciones);
+    };
+    window.addEventListener("jxr:elena-mapa", alElena);
+    return () => window.removeEventListener("jxr:elena-mapa", alElena);
+  }, [aplicarAccionesElena]);
+  useEffect(() => {
+    if (!circuitosGeo) return;
+    try {
+      const crudo = sessionStorage.getItem("jxr:elena-mapa-pendiente");
+      if (!crudo) return;
+      sessionStorage.removeItem("jxr:elena-mapa-pendiente");
+      aplicarAccionesElena(JSON.parse(crudo) as AccionMapaElena[]);
+    } catch {
+      // sin storage no hay acción pendiente que aplicar
+    }
+  }, [circuitosGeo, aplicarAccionesElena]);
+
+  const rangoElena = useMemo(() => {
+    if (!capaElena?.valores || capaElena.valores.size === 0) return null;
+    const v = [...capaElena.valores.values()];
+    return { min: Math.min(...v), max: Math.max(...v) };
+  }, [capaElena]);
 
   const seleccionarCircuito = useCallback((codigo: string) => {
     setEscuelaSel(null);
@@ -1226,13 +1450,19 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
           if (!geo) return null;
           const activa = tipo === tipoActivo;
           const relleno =
-            vista === "padron"
+            tipo === "circuito" && rangoElena
+              ? capaCoropletaValor(tipo, "elenaValor", rangoElena.min, rangoElena.max, c.rampa2023)
+              : vista === "padron"
               ? capaCoropleta(tipo, "electores", maxElectores, c.rampaPadron)
               : vista === "v2023"
                 ? capaCoropleta(tipo, "votos2023", maxVotos2023, c.rampa2023)
                 : vista === "prioridad"
                   ? capaCoropleta(tipo, "huerfanos", maxHuerfanos, c.rampa2023)
-                  : capaRellenoOperativo(tipo, vista === "escuelas" ? false : verCobertura);
+                  : vista === "oportunidad"
+                    ? capaCoropleta(tipo, "oportunidad", 100, c.rampa2023)
+                    : vista === "evolucion" && rangoDelta
+                      ? capaCoropletaValor(tipo, "delta", rangoDelta.min, rangoDelta.max, c.rampa2023)
+                      : capaRellenoOperativo(tipo, vista === "escuelas" || vista === "evolucion" ? false : verCobertura);
           const tresD =
             vista === "padron"
               ? capa3DCoropleta(tipo, "electores", maxElectores, c.rampaPadron)
@@ -1240,7 +1470,9 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
                 ? capa3DCoropleta(tipo, "votos2023", maxVotos2023, c.rampa2023)
                 : vista === "prioridad"
                   ? capa3DCoropleta(tipo, "huerfanos", maxHuerfanos, c.rampa2023)
-                  : capa3DOperativo(tipo);
+                  : vista === "oportunidad"
+                    ? capa3DCoropleta(tipo, "oportunidad", 100, c.rampa2023)
+                    : capa3DOperativo(tipo);
           return (
             <Source key={tipo} id={tipo} type="geojson" data={geo}>
               {activa && !ver3D && <Layer {...relleno} />}
@@ -1254,7 +1486,17 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
               {activa && hover && <Layer {...capaHoverLinea(tipo, hover.codigo, tema)} />}
               {seleccion?.tipo === tipo && <Layer {...capaSeleccionGlow(tipo, seleccion.codigo)} />}
               {seleccion?.tipo === tipo && <Layer {...capaSeleccion(tipo, seleccion.codigo)} />}
-              {activa && <Layer {...capaNombre(tipo, vista, tema)} />}
+              {/* Resaltado múltiple de Elena (solo circuitos), sin Fragment */}
+              {tipo === "circuito" && capaElena?.resaltados && (
+                <Layer key={`elena-glow-${capaElena.etiqueta}`} {...capaElenaGlow(capaElena.resaltados)} />
+              )}
+              {tipo === "circuito" && capaElena?.resaltados && (
+                <Layer key={`elena-relleno-${capaElena.etiqueta}`} {...capaElenaRelleno(capaElena.resaltados)} />
+              )}
+              {tipo === "circuito" && capaElena?.resaltados && (
+                <Layer key={`elena-linea-${capaElena.etiqueta}`} {...capaElenaLinea(capaElena.resaltados)} />
+              )}
+              {activa && <Layer {...capaNombre(tipo, vista, tema, tipo === "circuito" && !!rangoElena)} />}
             </Source>
           );
         })}
@@ -1451,6 +1693,53 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
           </div>
         )}
 
+        {vista === "oportunidad" && topOportunidad.length > 0 && (
+          <div className="panel-vidrio pointer-events-auto flex max-w-full items-center gap-1.5 overflow-x-auto rounded-xl px-3 py-1.5 text-[11px]">
+            <span className="shrink-0 text-texto-3">Dónde invertir primero:</span>
+            {topOportunidad.map((f) => (
+              <button
+                key={f.circuito}
+                onClick={() => seleccionarCircuito(f.circuito)}
+                className="num shrink-0 rounded-full border border-rosa/40 px-2 py-0.5 font-bold text-rosa transition hover:border-rosa"
+                title={`IO ${f.indice} · ${numero(f.votosDisperso)} dispersos 2023 · bolsa ${Math.round(f.bolsaPct)}% · clic para abrirlo`}
+              >
+                {f.circuito} · {f.indice}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {vista === "evolucion" && listas23 && listas25 && (
+          <div className="panel-vidrio pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 rounded-xl p-1.5 text-[11px]">
+            <select
+              value={sel23 ?? ""}
+              onChange={(e) => setSel23(Number(e.target.value))}
+              title="Lista 2023 (Concejal) contra la que se compara"
+              className="max-w-[46vw] rounded-lg bg-panel-2 px-1.5 py-1 text-[11px] outline-none sm:max-w-56"
+            >
+              {listas23.map((l) => (
+                <option key={l.lista_id} value={l.lista_id}>
+                  2023 · {l.lista_id} {l.lista}
+                </option>
+              ))}
+            </select>
+            <span className="text-texto-3">→</span>
+            <select
+              value={sel25 ?? ""}
+              onChange={(e) => setSel25(Number(e.target.value))}
+              title="Agrupación 2025 (Diputados, provisorio)"
+              className="max-w-[46vw] rounded-lg bg-panel-2 px-1.5 py-1 text-[11px] outline-none sm:max-w-56"
+            >
+              {listas25.map((l) => (
+                <option key={l.lista_id} value={l.lista_id}>
+                  2025 · {l.lista}
+                </option>
+              ))}
+            </select>
+            {deltas === null && <span className="text-texto-3">calculando…</span>}
+          </div>
+        )}
+
         {vista === "escuelas" && escuelasMin > 0 && (
           <div className="panel-vidrio pointer-events-auto flex items-center gap-2 rounded-xl px-3 py-1.5 text-[11px]">
             <span>
@@ -1462,6 +1751,25 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
           </div>
         )}
         </div>
+
+        {/* ── Análisis de Elena activo sobre el mapa ── */}
+        {capaElena && (
+          <div className="panel-vidrio pointer-events-auto flex max-w-full items-center gap-2 rounded-xl border-amarillo/50 px-3 py-1.5 text-[11px]">
+            <Sparkles size={12} className="shrink-0 text-amarillo" />
+            <span className="min-w-0 truncate">
+              <b>Elena:</b> {capaElena.etiqueta}
+              {capaElena.resaltados ? ` · ${capaElena.resaltados.length} circuitos` : ""}
+              {rangoElena ? ` · ${numero(rangoElena.min)} a ${numero(rangoElena.max)}` : ""}
+            </span>
+            <button
+              onClick={() => setCapaElena(null)}
+              title="Quitar el análisis de Elena del mapa"
+              className="shrink-0 text-texto-3 transition hover:text-texto"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Aviso de la búsqueda/acciones ── */}
@@ -1493,6 +1801,22 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
         >
           <X size={11} />
         </button>
+        {rangoElena && (
+          <>
+            <div className="mb-1 font-bold tracking-wide text-amarillo uppercase">Elena · {capaElena?.etiqueta}</div>
+            <div
+              className="h-2 w-full rounded-sm"
+              style={{
+                background:
+                  rangoElena.min < 0
+                    ? "linear-gradient(90deg,#e14f42,#6b7280,#22c55e)"
+                    : `linear-gradient(90deg,${c.rampa2023[0]},${c.rampa2023[1]},${c.rampa2023[2]})`,
+              }}
+            />
+            <div className="flex justify-between text-texto-3"><span>{numero(rangoElena.min)}</span><span>{numero(rangoElena.max)}</span></div>
+            <div className="mb-1.5 border-b border-borde pb-1.5 text-texto-3">Coropleta pedida en el chat (tapa la de la vista)</div>
+          </>
+        )}
         {vista === "operativo" && (
           <>
             <div className="mb-1 font-bold tracking-wide text-texto-2 uppercase">Cobertura</div>
@@ -1527,6 +1851,42 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
             <div className="mt-1">Relleno del circuito = votos huérfanos</div>
             <div className="h-2 w-full rounded-sm" style={{ background: `linear-gradient(90deg,${c.rampa2023[0]},${c.rampa2023[1]},${c.rampa2023[2]})` }} />
             <div className="flex justify-between text-texto-3"><span>0</span><span>{numero(maxHuerfanos)}</span></div>
+          </>
+        )}
+        {vista === "oportunidad" && (
+          <>
+            <div className="mb-1 font-bold tracking-wide text-texto-2 uppercase">Índice de Oportunidad (0–100)</div>
+            <div className="h-2 w-full rounded-sm" style={{ background: `linear-gradient(90deg,${c.rampa2023[0]},${c.rampa2023[1]},${c.rampa2023[2]})` }} />
+            <div className="flex justify-between text-texto-3"><span>0</span><span>100</span></div>
+            <div className="mt-1 text-texto-3">
+              40% voto disperso 2023 · 35% bolsa 2025 (blancos + ausentes) · 25% competitividad 2025.
+              Alto = mucha base propia potencial, muchos votos sin dueño y elección peleada.
+            </div>
+          </>
+        )}
+        {vista === "evolucion" && (
+          <>
+            <div className="mb-1 font-bold tracking-wide text-texto-2 uppercase">Evolución 2023 → 2025</div>
+            <div
+              className="h-2 w-full rounded-sm"
+              style={{
+                background:
+                  rangoDelta && rangoDelta.min < 0
+                    ? "linear-gradient(90deg,#e14f42,#6b7280,#22c55e)"
+                    : `linear-gradient(90deg,${c.rampa2023[0]},${c.rampa2023[1]},${c.rampa2023[2]})`,
+              }}
+            />
+            <div className="flex justify-between text-texto-3">
+              <span>{rangoDelta ? `${conSigno(rangoDelta.min)} pts` : "cae"}</span>
+              <span>{rangoDelta ? `${conSigno(rangoDelta.max)} pts` : "crece"}</span>
+            </div>
+            <div className="mt-1 text-texto-3">
+              Puntos de % que la agrupación 2025 saca por encima o debajo de la lista 2023 en cada circuito.
+              {rangoDelta && rangoDelta.min < 0
+                ? " Verde = creció, rojo = cayó."
+                : " Creció en todos los circuitos: más oscuro = creció más."}{" "}
+              Elecciones distintas: leer como tendencia. 2025 es provisorio.
+            </div>
           </>
         )}
         {vista === "escuelas" && (
@@ -1568,11 +1928,42 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
                 {sexoFiltro || franjaClave !== "todas" ? " (filtro activo)" : ""}
               </div>
             )}
+            {tipoActivo === "circuito" && capaElena?.valores?.has(hover.codigo) && (
+              <div>
+                <b className="num text-amarillo">{numero(capaElena.valores.get(hover.codigo) ?? 0)}</b> {capaElena.etiqueta}
+              </div>
+            )}
             {tipoActivo === "circuito" && votos2023?.has(hover.codigo) && (
               <div>
                 <b className="num text-rosa">{numero(votos2023.get(hover.codigo) ?? 0)}</b> votos dispersos 2023
               </div>
             )}
+            {tipoActivo === "circuito" && vista === "oportunidad" && oportunidad?.has(hover.codigo) && (() => {
+              const f = oportunidad.get(hover.codigo)!;
+              return (
+                <div>
+                  <div>
+                    <b className="num text-rosa">IO {f.indice}</b> · {numero(f.votosDisperso)} dispersos 2023
+                  </div>
+                  <div>
+                    bolsa 2025: <b className="num">{numero(f.blancos2025 + f.ausentes2025)}</b> ({Math.round(f.bolsaPct)}%) ·{" "}
+                    {f.ganador2025} +{numero(f.diferencia2025)}
+                  </div>
+                </div>
+              );
+            })()}
+            {tipoActivo === "circuito" && vista === "evolucion" && deltas?.has(hover.codigo) && (() => {
+              const f = deltas.get(hover.codigo)!;
+              const d = Number(f.delta_pct);
+              return (
+                <div>
+                  <b className={`num ${d >= 0 ? "text-completo" : "text-sin"}`}>{d >= 0 ? "+" : ""}{d} pts</b>{" "}
+                  <span className="text-texto-3">
+                    ({f.pct_2023}% → {f.pct_2025}%)
+                  </span>
+                </div>
+              );
+            })()}
             {tipoActivo === "circuito" && prioridad !== null && (huerfanosCirc.get(hover.codigo) ?? 0) > 0 && (
               <div>
                 <b className="num text-sin">{numero(huerfanosCirc.get(hover.codigo) ?? 0)}</b> huérfanos (sin referente)

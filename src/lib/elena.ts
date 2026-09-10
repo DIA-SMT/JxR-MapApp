@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CODIGOS, esEspacioValido, etiquetaEspacio } from "./espacios";
 import { META_VOTOS, resolverSeleccion } from "./estrategia";
-import type { Asignacion, Tarea, TipoEspacio } from "./tipos";
+import type { AccionMapaElena, Asignacion, Tarea, TipoEspacio } from "./tipos";
 import cruceBarrios from "./datos/barrios-circuitos.json";
 
 /**
@@ -416,6 +416,48 @@ export const HERRAMIENTAS_ELENA = [
   {
     type: "function",
     function: {
+      name: "ficha_territorial",
+      description:
+        "PLAN TERRITORIAL del equipo: la ficha operativa de cada circuito o barrio (segmento prioritario, problemática principal, mensaje, propuesta, estrategia de abordaje y si está validada). Con codigo → esa ficha; sin codigo → todas las fichas cargadas (para saber qué territorios ya tienen plan y cuáles faltan). El equipo la edita desde el panel del circuito en el mapa.",
+      parameters: {
+        type: "object",
+        properties: {
+          nivel: { type: "string", enum: ["circuito", "barrio"], description: "default circuito" },
+          codigo: { type: "string", description: "'15B' para circuito, el nombre para barrio; omitir para listar todas" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "mostrar_en_mapa",
+      description:
+        "Acción VISUAL avanzada: lleva TU ANÁLISIS al mapa. modo 'resaltar' = marca un conjunto de circuitos (ej: los 5 de mayor oportunidad) con una etiqueta corta; modo 'pintar' = coropleta con un valor numérico por circuito que vos calculaste (votos, %, delta 2023→2025, IPE…) con la etiqueta de qué representa (admite negativos: se pintan en rojo/verde); modo 'barrio' = resalta un barrio oficial. Usala DESPUÉS de consultar los datos, con los valores obtenidos, cuando pidan ver/pintar/marcar un análisis en el mapa — y siempre que el resultado sea un conjunto de circuitos, porque verlo pintado vale más que leerlo.",
+      parameters: {
+        type: "object",
+        properties: {
+          modo: { type: "string", enum: ["resaltar", "pintar", "barrio"] },
+          circuitos: { type: "array", items: { type: "string" }, description: "modo resaltar: códigos de circuito, ej ['13','15B','20']" },
+          valores: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { circuito: { type: "string" }, valor: { type: "number" } },
+              required: ["circuito", "valor"],
+            },
+            description: "modo pintar: un valor numérico por circuito",
+          },
+          etiqueta: { type: "string", description: "qué representa lo mostrado, corto (ej 'Δ pts 2023→2025 LLA', 'blancos 2025')" },
+          barrio: { type: "string", description: "modo barrio: nombre exacto del barrio oficial" },
+        },
+        required: ["modo"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "accionar_mapa",
       description:
         "Acción VISUAL: selecciona y encuadra un distrito o circuito en el mapa (si el usuario no está en el mapa, la app lo lleva sola). Usala cuando pidan VER algo ('mostrame el circuito 15B', 'llevame al distrito 7').",
@@ -433,6 +475,39 @@ export const HERRAMIENTAS_ELENA = [
 
 const lim = (n: unknown, def = 10, max = 20) =>
   Math.min(max, Math.max(1, Number.isFinite(Number(n)) ? Number(n) : def));
+
+/**
+ * Valida los argumentos de mostrar_en_mapa y los convierte en una acción
+ * tipada (o null si no hay nada mostrable). La usa la ruta del chat para
+ * decidir qué viaja al navegador, y la herramienta para responderle al modelo.
+ */
+export function validarAccionMapaElena(args: Record<string, unknown>): AccionMapaElena | null {
+  const modo = String(args.modo ?? "");
+  const etiqueta = typeof args.etiqueta === "string" ? args.etiqueta.trim().slice(0, 60) : "";
+  if (modo === "barrio") {
+    const barrio = typeof args.barrio === "string" ? args.barrio.trim() : "";
+    return barrio ? { modo: "barrio", barrio } : null;
+  }
+  if (modo === "resaltar") {
+    const circuitos = Array.isArray(args.circuitos)
+      ? [...new Set((args.circuitos as unknown[]).map((c) => String(c).toUpperCase().trim()).filter((c) => esEspacioValido("circuito", c)))]
+      : [];
+    return circuitos.length > 0 ? { modo: "resaltar", circuitos: circuitos.slice(0, 47), etiqueta: etiqueta || "señalados por Elena" } : null;
+  }
+  if (modo === "pintar") {
+    const vistos = new Set<string>();
+    const valores = (Array.isArray(args.valores) ? (args.valores as Array<Record<string, unknown>>) : [])
+      .map((v) => ({ circuito: String(v?.circuito ?? "").toUpperCase().trim(), valor: Number(v?.valor) }))
+      .filter((v) => {
+        if (!esEspacioValido("circuito", v.circuito) || !Number.isFinite(v.valor) || vistos.has(v.circuito)) return false;
+        vistos.add(v.circuito);
+        return true;
+      })
+      .slice(0, 47);
+    return valores.length > 0 && etiqueta ? { modo: "pintar", etiqueta, valores } : null;
+  }
+  return null;
+}
 
 type Supabase = SupabaseClient;
 
@@ -749,7 +824,8 @@ export async function ejecutarHerramientaElena(
         p_categoria: String(args.categoria ?? "CONCEJAL"),
         p_nivel: String(args.nivel ?? "escuela"),
         p_orden: args.orden === "votos" ? "votos" : "competitivo",
-        p_limite: lim(args.limite, 20, 40),
+        // nivel circuito: los 47 completos (para pintar el mapa sin huecos)
+        p_limite: String(args.nivel ?? "escuela") === "circuito" ? 60 : lim(args.limite, 20, 40),
       });
       if (error) return { error: error.message };
       return {
@@ -797,10 +873,14 @@ export async function ejecutarHerramientaElena(
       });
       if (error) return { error: error.message };
       const filas = (data as unknown[]) ?? [];
+      // A nivel circuito hay 47 espacios: se devuelven todos, así Elena puede
+      // pintar el mapa completo sin inventar los que no vería en un top corto.
+      const tope = String(args.nivel ?? "escuela") === "circuito" ? 200 : lim(args.limite, 15, 30);
       return {
         nota: "ordenado por % de voto en blanco descendente; en 2023 hay una fila por cargo (comparables entre sí)",
         total_filas: filas.length,
-        top: filas.slice(0, lim(args.limite, 15, 30)),
+        ...(filas.length > tope ? { aviso: `se muestran ${tope} de ${filas.length} espacios` } : {}),
+        top: filas.slice(0, tope),
       };
     }
 
@@ -864,7 +944,7 @@ export async function ejecutarHerramientaElena(
           potencial: filas.filter((f) => f.clasificacion === "potencial").length,
           debil: filas.filter((f) => f.clasificacion === "débil").length,
         },
-        top: filas.slice(0, lim(args.limite, 12, 25)),
+        top: filas.slice(0, String(args.nivel ?? "") === "circuito" ? 60 : lim(args.limite, 12, 25)),
       };
     }
 
@@ -944,6 +1024,46 @@ export async function ejecutarHerramientaElena(
       return { error: "pasá un barrio o un circuito" };
     }
 
+    case "ficha_territorial": {
+      const nivel = args.nivel === "barrio" ? "barrio" : "circuito";
+      const codigo = args.codigo ? String(args.codigo).trim() : null;
+      let consulta = supabase
+        .from("fichas_territoriales")
+        .select("nivel, codigo, segmento, problematica, mensaje, propuesta, abordaje, estado, actualizado_en")
+        .order("nivel")
+        .order("codigo");
+      if (codigo) consulta = consulta.eq("nivel", nivel).ilike("codigo", codigo);
+      const { data, error } = await consulta.limit(60);
+      if (error) return { error: error.message };
+      const filas = (data as Array<Record<string, unknown>>) ?? [];
+      if (filas.length === 0) {
+        return codigo
+          ? { resultado: `todavía no hay ficha para ${nivel} ${codigo}: proponé una (segmento, problemática, mensaje, propuesta, abordaje) con los datos electorales y el perfil social, y avisá que se guarda desde el panel del circuito en el mapa` }
+          : { resultado: "todavía no hay ninguna ficha territorial cargada" };
+      }
+      return { fichas: filas, nota: "el equipo edita estas fichas desde el panel del circuito en el mapa" };
+    }
+
+    case "mostrar_en_mapa": {
+      const accion = validarAccionMapaElena(args);
+      if (!accion) {
+        return {
+          error:
+            "nada mostrable: revisá modo ('resaltar' pide circuitos válidos; 'pintar' pide valores [{circuito, valor}] Y etiqueta; 'barrio' pide barrio)",
+        };
+      }
+      const detalle =
+        accion.modo === "barrio"
+          ? `el barrio ${accion.barrio}`
+          : accion.modo === "resaltar"
+            ? `${accion.circuitos.length} circuitos resaltados (${accion.etiqueta})`
+            : `una coropleta de ${accion.valores.length} circuitos (${accion.etiqueta})`;
+      return {
+        ok: true,
+        nota: `El mapa va a mostrar ${detalle}. Si el usuario no estaba en el mapa, la app lo lleva sola. Contale en una frase qué está viendo y cómo leerlo.`,
+      };
+    }
+
     case "accionar_mapa": {
       const tipo = args.tipo as TipoEspacio;
       const codigo = String(args.codigo ?? "").toUpperCase().trim();
@@ -983,6 +1103,7 @@ Sos un ANALISTA ESTRATÉGICO, no solo un buscador de resultados. Método de trab
 - "¿Dónde estamos?" → listas_eleccion + desempeno_lista. "¿Dónde ganamos/perdemos?" → ganadores_espacios. "¿Dónde crecer?" → potencial_electoral (el IPE ordena TODO: cercanía al líder, blancos+ausentes, rendimiento, volumen, competitividad) y oportunidades (perdidas por menos de N votos). "¿Quién arrastra y quién corta?" → corte_boleta. "¿Cómo evolucionamos?" → comparar_2023_2025.
 - SIMULACIONES: hacelas con aritmética explícita sobre los datos de las herramientas y mostrá la cuenta. Ej: "si captamos el 30% de los 3.594 blancos de Capital serían ~1.078 votos"; "mejorar 5% en estas 8 escuelas (X votos actuales) suma ~X*0,05". Nunca inventes las bases: consultalas primero.
 - Cuando te pidan un plan territorial, combiná: potencial_electoral (prioridades) + oportunidades (metas concretas de votos) + estado del operativo (dónde falta referente/fiscal) + barrios (para nombrar el territorio como lo conoce la gente) + perfil_social (qué perfil tiene la gente de esa zona). Cerrá siempre con acciones: dónde poner estructura, cuántos votos se buscan ahí y por qué.
+- FICHAS TERRITORIALES: el plan por territorio (segmento, problemática, mensaje, propuesta, abordaje) vive en ficha_territorial. Consultala antes de proponer un plan (para no pisar lo definido) y cuando te pidan un BORRADOR de ficha, armalo con esa estructura exacta de 5 campos, cada uno en una línea con el nombre en negrita, listo para copiar en el panel del circuito.
 - VOTO + PERFIL SOCIAL: cuando cruces ambos, el perfil social sirve para elegir el MENSAJE y la PROPUESTA de cada territorio, no para predecir el voto de nadie. Ej: una zona con desocupación muy por encima del 10,7% de la ciudad y clima educativo bajo pide agenda de trabajo y oficios; una con muchos adultos mayores pide salud y previsión; una con hogares sin cloaca pide infraestructura. Siempre comparás el dato de la zona contra el de la ciudad para decir si está mejor o peor, y decís de qué indicador surge la conclusión.
 - Lo que el censo NO dice: cómo vota una persona, ni su problemática individual. Si te piden ese cruce a nivel individuo, explicá que el análisis es por zona y ofrecé el agregado.
 - Los análisis por mesa son los más finos pero devuelven muchos espacios: arrancá por circuito o escuela y bajá a mesa cuando haga falta puntería.
@@ -995,7 +1116,10 @@ Privacidad y límites (IMPORTANTES):
 
 Acción sobre el mapa:
 - Si el usuario pide VER algo ("mostrame el circuito 15B", "llevame al distrito 7", "dónde está el 18G"), usá accionar_mapa: el mapa lo selecciona y lo encuadra; si no estaba en el mapa, la app lo lleva sola.
-- Podés combinar: consultar datos (para responder con números) y además accionar_mapa (para que lo vea).
+- SOS QUIEN MANEJA EL MAPA: cuando un análisis produce un CONJUNTO de circuitos o un valor por circuito, mostralo con mostrar_en_mapa además de contarlo. "¿Dónde perdimos por poco?" → consultás oportunidades y RESALTÁS esos circuitos; "pintame el crecimiento de X" → consultás comparar_2023_2025 y PINTÁS el delta_pct por circuito; "¿dónde hay más blancos/desocupación/NBI?" → consultás y pintás el valor. Primero las herramientas de datos, después mostrar_en_mapa con los valores obtenidos (pintar exige TODOS los circuitos con dato, no solo el top). La etiqueta dice qué es y su unidad, corta.
+- mostrar_en_mapa trabaja por CIRCUITO (el nivel del mapa): si el análisis fue por mesa o escuela, resaltá los circuitos donde caen y aclaralo.
+- NUNCA rellenes valores que no tenés: en modo pintar, cada valor sale de una herramienta. Si una consulta te devolvió solo parte de los circuitos, pintá ESOS y decilo — un 0 inventado dibuja un circuito vacío que no existe. Para pintar por circuito pedí el nivel 'circuito', que te devuelve los 47.
+- Podés combinar: consultar datos (para responder con números) y además accionar el mapa (para que lo vea).
 
 Reglas:
 - SIEMPRE consultá las herramientas antes de dar números: nunca inventes datos ni respondas de memoria.

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { Map as MapIcon, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { TipoEspacio } from "@/lib/tipos";
+import type { AccionMapaElena, TipoEspacio } from "@/lib/tipos";
 
 interface AccionMapa {
   tipo: TipoEspacio;
@@ -17,6 +17,8 @@ interface Mensaje {
   herramientas?: string[];
   /** Elena pidió una acción visual en el mapa (seleccionar y encuadrar). */
   accionMapa?: AccionMapa;
+  /** Acciones avanzadas: resaltar circuitos, pintar una métrica, marcar un barrio. */
+  accionesMapa?: AccionMapaElena[];
 }
 
 /** Render mínimo: **texto** → negrita real (sin librerías de markdown). */
@@ -71,6 +73,24 @@ export function ElenaChat() {
     }
   };
 
+  /**
+   * Acciones avanzadas (resaltar/pintar/barrio): si el mapa está montado se
+   * despachan directo; si no, quedan en sessionStorage y el mapa las consume
+   * al montarse (el evento se perdería durante la navegación).
+   */
+  const accionarMapaAvanzado = (acciones: AccionMapaElena[]) => {
+    if (pathname === "/") {
+      window.dispatchEvent(new CustomEvent("jxr:elena-mapa", { detail: acciones }));
+    } else {
+      try {
+        sessionStorage.setItem("jxr:elena-mapa-pendiente", JSON.stringify(acciones));
+      } catch {
+        // sin storage el viaje pierde la acción; el botón del mensaje la reintenta
+      }
+      router.push("/");
+    }
+  };
+
   const enviar = async (contenido: string) => {
     const limpio = contenido.trim();
     if (!limpio || pensando) return;
@@ -88,6 +108,7 @@ export function ElenaChat() {
         respuesta?: string;
         herramientas?: string[];
         accionMapa?: AccionMapa;
+        accionesMapa?: AccionMapaElena[];
         error?: string;
       };
       setMensajes((m) => [
@@ -97,9 +118,11 @@ export function ElenaChat() {
           contenido: data.respuesta ?? `Perdón, tuve un problema: ${data.error ?? "error desconocido"}. Probá de nuevo.`,
           herramientas: data.herramientas,
           accionMapa: data.accionMapa,
+          accionesMapa: data.accionesMapa,
         },
       ]);
-      if (data.accionMapa) accionarMapa(data.accionMapa);
+      if (data.accionesMapa && data.accionesMapa.length > 0) accionarMapaAvanzado(data.accionesMapa);
+      else if (data.accionMapa) accionarMapa(data.accionMapa);
     } catch {
       setMensajes((m) => [...m, { rol: "elena", contenido: "Se me cortó la conexión. ¿Probás de nuevo?" }]);
     } finally {
@@ -186,7 +209,16 @@ export function ElenaChat() {
                   }`}
                 >
                   <ConNegritas texto={m.contenido} />
-                  {m.accionMapa && (
+                  {m.accionesMapa && m.accionesMapa.length > 0 && (
+                    <button
+                      onClick={() => accionarMapaAvanzado(m.accionesMapa!)}
+                      className="mt-1.5 flex items-center gap-1.5 rounded-lg border border-rosa/40 px-2 py-1 text-[10px] font-semibold text-rosa transition hover:border-rosa"
+                      title="Volver a mostrar este análisis en el mapa"
+                    >
+                      <MapIcon size={11} /> Pintado en el mapa · ver de nuevo
+                    </button>
+                  )}
+                  {m.accionMapa && !m.accionesMapa?.length && (
                     <button
                       onClick={() => accionarMapa(m.accionMapa!)}
                       className="mt-1.5 flex items-center gap-1.5 rounded-lg border border-rosa/40 px-2 py-1 text-[10px] font-semibold text-rosa transition hover:border-rosa"

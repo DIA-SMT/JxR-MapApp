@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Plus, School, Search, Sparkles, Square, Trash2, UserPlus, Users2, Vote, X } from "lucide-react";
+import { Check, ClipboardList, Plus, Printer, School, Search, Sparkles, Square, Trash2, UserPlus, Users2, Vote, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { etiquetaEspacio } from "@/lib/espacios";
 import {
@@ -13,10 +13,14 @@ import {
 } from "@/lib/padron";
 import {
   armarMesasPeleadas,
+  FICHA_VACIA,
+  guardarFicha,
+  obtenerFicha,
   obtenerMesas2025Circuito,
   obtenerPerfilSocial,
   obtenerRankingCircuito,
   obtenerVotos2025Circuito,
+  type FichaTerritorial,
   type FilaRankingEspacio,
   type MesaPeleada,
   type PerfilSocial,
@@ -30,6 +34,145 @@ const BARRIOS_POR_CIRCUITO = (cruceBarrios as unknown as {
 }).por_circuito;
 
 const numero = (n: number) => n.toLocaleString("es-AR");
+
+/** Los 5 campos del plan territorial, en el orden en que se piensan. */
+const CAMPOS_FICHA: Array<{ clave: keyof Pick<FichaTerritorial, "segmento" | "problematica" | "mensaje" | "propuesta" | "abordaje">; etiqueta: string; pista: string }> = [
+  { clave: "segmento", etiqueta: "Segmento prioritario", pista: "¿A quién le hablamos acá? (ej: jóvenes sin primer empleo)" },
+  { clave: "problematica", etiqueta: "Problemática principal", pista: "¿Qué duele en esta zona? (del perfil social y el territorio)" },
+  { clave: "mensaje", etiqueta: "Mensaje", pista: "La idea fuerza, en una frase" },
+  { clave: "propuesta", etiqueta: "Propuesta", pista: "Qué se ofrece concreto" },
+  { clave: "abordaje", etiqueta: "Estrategia de abordaje", pista: "Cómo se trabaja: puerta a puerta, referentes, actividades…" },
+];
+
+/**
+ * Ficha de inteligencia territorial del circuito: el plan editable que
+ * convierte el análisis en operación. Elena puede armar el borrador; el
+ * equipo lo ajusta acá y lo valida.
+ */
+function FichaCircuito({
+  supabase,
+  codigo,
+  onPreguntarElena,
+}: {
+  supabase: ReturnType<typeof useTerritorio>["supabase"];
+  codigo: string;
+  onPreguntarElena: (texto: string) => void;
+}) {
+  const [ficha, setFicha] = useState<FichaTerritorial>(FICHA_VACIA("circuito", codigo));
+  const [existe, setExiste] = useState(false);
+  const [abierta, setAbierta] = useState(false);
+  const [sucia, setSucia] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [errorFicha, setErrorFicha] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFicha(FICHA_VACIA("circuito", codigo));
+    setExiste(false);
+    setSucia(false);
+    setErrorFicha(null);
+    const vivo = { actual: true };
+    void obtenerFicha(supabase, "circuito", codigo).then((f) => {
+      if (!vivo.actual || !f) return;
+      setFicha(f);
+      setExiste(true);
+    });
+    return () => {
+      vivo.actual = false;
+    };
+  }, [supabase, codigo]);
+
+  const completa = CAMPOS_FICHA.filter((c) => ficha[c.clave].trim() !== "").length;
+
+  const guardar = async (estado?: FichaTerritorial["estado"]) => {
+    if (guardando) return;
+    setGuardando(true);
+    setErrorFicha(null);
+    const definitiva = { ...ficha, ...(estado ? { estado } : {}) };
+    const error = await guardarFicha(supabase, definitiva);
+    if (error) setErrorFicha(error);
+    else {
+      setFicha(definitiva);
+      setExiste(true);
+      setSucia(false);
+    }
+    setGuardando(false);
+  };
+
+  return (
+    <div className="rounded-xl border border-borde bg-panel-2/70 p-3">
+      <button
+        onClick={() => setAbierta((v) => !v)}
+        className="flex w-full items-center justify-between text-[11px] font-bold tracking-wide text-texto-2 uppercase"
+      >
+        <span className="flex items-center gap-1.5">
+          <ClipboardList size={12} className="text-amarillo" /> Plan territorial
+          {existe && (
+            <span
+              className={`rounded-full border px-1.5 py-0.5 text-[9px] font-bold normal-case ${
+                ficha.estado === "validada"
+                  ? "border-completo/40 bg-completo/10 text-completo"
+                  : "border-encurso/40 bg-encurso/10 text-encurso"
+              }`}
+            >
+              {ficha.estado === "validada" ? "validada" : `borrador · ${completa}/5`}
+            </span>
+          )}
+          {!existe && <span className="font-normal normal-case text-texto-3">(sin definir)</span>}
+        </span>
+        <span>{abierta ? "▴" : "▾"}</span>
+      </button>
+
+      {abierta && (
+        <div className="mt-2 space-y-2">
+          {CAMPOS_FICHA.map((c) => (
+            <div key={c.clave}>
+              <div className="mb-0.5 text-[9px] font-bold tracking-wide text-texto-3 uppercase">{c.etiqueta}</div>
+              <textarea
+                value={ficha[c.clave]}
+                onChange={(e) => {
+                  setFicha((f) => ({ ...f, [c.clave]: e.target.value }));
+                  setSucia(true);
+                }}
+                placeholder={c.pista}
+                rows={2}
+                className="w-full resize-none rounded-lg border border-borde-2 bg-panel px-2 py-1.5 text-[11px] outline-none placeholder:text-texto-3 focus:border-rosa/50"
+              />
+            </div>
+          ))}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              onClick={() => void guardar()}
+              disabled={guardando || !sucia}
+              className="rounded-lg bg-rosa px-3 py-1.5 text-[11px] font-bold text-white transition hover:brightness-110 disabled:opacity-40"
+            >
+              {guardando ? "Guardando…" : "Guardar"}
+            </button>
+            <button
+              onClick={() => void guardar(ficha.estado === "validada" ? "borrador" : "validada")}
+              disabled={guardando}
+              className="rounded-lg border border-completo/50 px-3 py-1.5 text-[11px] font-bold text-completo transition hover:bg-completo/10 disabled:opacity-40"
+              title="Una ficha validada es el plan acordado del territorio"
+            >
+              {ficha.estado === "validada" ? "Volver a borrador" : "Marcar validada"}
+            </button>
+            <button
+              onClick={() =>
+                onPreguntarElena(
+                  "armame el borrador de la ficha territorial: segmento prioritario, problemática principal, mensaje, propuesta y estrategia de abordaje — cruzando 2023, 2025, blancos/ausentes y el perfil social del censo",
+                )
+              }
+              className="flex items-center gap-1 rounded-lg border border-rosa/40 px-2.5 py-1.5 text-[11px] font-semibold text-rosa transition hover:border-rosa"
+              title="Elena propone el plan con los datos reales; después lo copiás acá y lo ajustás"
+            >
+              <Sparkles size={11} /> Borrador con Elena
+            </button>
+          </div>
+          {errorFicha && <p className="text-[10px] text-peligro">{errorFicha}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const CHIP_ESTADO = {
   sin: { texto: "Sin asignar", clase: "border-sin/40 bg-sin/10 text-sin" },
@@ -295,9 +438,20 @@ export function PanelEspacio({
             {resumen && resumen.tareas.length > 0 && ` · ${resumen.nHechas}/${resumen.tareas.length} tareas`}
           </span>
         </div>
-        <button onClick={onCerrar} className="text-texto-3 hover:text-texto">
-          <X size={16} />
-        </button>
+        <div className="flex items-center gap-2.5">
+          {seleccion.tipo === "circuito" && (
+            <button
+              onClick={() => window.open(`/imprimir/circuito/${encodeURIComponent(seleccion.codigo)}`, "_blank")}
+              title="Ficha del circuito lista para imprimir y darle al referente"
+              className="text-texto-3 transition hover:text-texto"
+            >
+              <Printer size={15} />
+            </button>
+          )}
+          <button onClick={onCerrar} className="text-texto-3 hover:text-texto">
+            <X size={16} />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
@@ -694,6 +848,11 @@ export function PanelEspacio({
               </>
             )}
           </div>
+        )}
+
+        {/* ── Plan territorial: la ficha operativa del circuito ── */}
+        {seleccion.tipo === "circuito" && (
+          <FichaCircuito supabase={supabase} codigo={seleccion.codigo} onPreguntarElena={preguntarElena} />
         )}
 
         {/* ── Consultarle a Elena sobre este circuito (libre o sugerido) ── */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Goal, Map as MapIcon, Menu, SlidersHorizontal, UserCog, Users, X } from "lucide-react";
+import { Activity, Goal, Map as MapIcon, Menu, SlidersHorizontal, UserCog, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -10,6 +10,7 @@ const SECCIONES = [
   { href: "/personas", etiqueta: "Personas", icono: Users },
   { href: "/estrategia", etiqueta: "Estrategia", icono: Goal },
   { href: "/segmentos", etiqueta: "Segmentos", icono: SlidersHorizontal },
+  { href: "/bunker", etiqueta: "Búnker", icono: Activity },
 ] as const;
 
 /**

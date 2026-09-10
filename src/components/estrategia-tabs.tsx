@@ -1,17 +1,19 @@
 "use client";
 
-import { Calculator, Crosshair, Target } from "lucide-react";
+import { Calculator, Crosshair, FileText, Target } from "lucide-react";
 import { useState } from "react";
 import { BancasDHondt } from "./bancas-dhondt";
 import { Estrategia2023 } from "./estrategia-2023";
+import { InformesSituacion } from "./informes-situacion";
 import { UniversoTerritorial } from "./universo-territorial";
 
-type Seccion = "voto-disperso" | "universo" | "bancas";
+type Seccion = "voto-disperso" | "universo" | "bancas" | "informes";
 
 const SECCIONES: Array<{ clave: Seccion; etiqueta: string; corta: string; icono: typeof Target; detalle: string }> = [
   { clave: "voto-disperso", etiqueta: "Voto disperso", corta: "Disperso", icono: Crosshair, detalle: "Frontera 20K y escuelas por umbral" },
   { clave: "universo", etiqueta: "Universo territorial", corta: "Universo", icono: Target, detalle: "Dónde están los votos de un conjunto de listas" },
   { clave: "bancas", etiqueta: "Bancas · D'Hondt", corta: "Bancas", icono: Calculator, detalle: "Piso, techo y escenarios de unificación" },
+  { clave: "informes", etiqueta: "Informes", corta: "Informes", icono: FileText, detalle: "Partes de situación escritos por Elena, guardados para el equipo" },
 ];
 
 /** Las tres mesas de trabajo de la estrategia electoral, en una sola pantalla. */
@@ -41,6 +43,7 @@ export function EstrategiaTabs() {
       {seccion === "voto-disperso" && <Estrategia2023 />}
       {seccion === "universo" && <UniversoTerritorial />}
       {seccion === "bancas" && <BancasDHondt />}
+      {seccion === "informes" && <InformesSituacion />}
     </div>
   );
 }

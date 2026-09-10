@@ -29,6 +29,16 @@ export interface Asignacion {
   personas?: Persona | null;
 }
 
+/**
+ * Acción visual que Elena puede pedirle al mapa desde un análisis:
+ * resaltar un conjunto de circuitos, pintar una métrica por circuito
+ * (coropleta, admite valores negativos) o marcar un barrio oficial.
+ */
+export type AccionMapaElena =
+  | { modo: "resaltar"; circuitos: string[]; etiqueta: string }
+  | { modo: "pintar"; etiqueta: string; valores: Array<{ circuito: string; valor: number }> }
+  | { modo: "barrio"; barrio: string };
+
 export interface Tarea {
   id: number;
   asignacion_id: number;

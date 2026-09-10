@@ -233,6 +233,211 @@ export function siglaAgrupacion(id: number, nombre: string): string {
   return letras.slice(0, 4) || nombre.slice(0, 4);
 }
 
+// ── Ficha de inteligencia territorial (plan por circuito/barrio) ────────────
+
+export interface FichaTerritorial {
+  nivel: "circuito" | "barrio";
+  codigo: string;
+  segmento: string;
+  problematica: string;
+  mensaje: string;
+  propuesta: string;
+  abordaje: string;
+  estado: "borrador" | "validada";
+  actualizado_en?: string;
+}
+
+export const FICHA_VACIA = (nivel: "circuito" | "barrio", codigo: string): FichaTerritorial => ({
+  nivel,
+  codigo,
+  segmento: "",
+  problematica: "",
+  mensaje: "",
+  propuesta: "",
+  abordaje: "",
+  estado: "borrador",
+});
+
+export async function obtenerFicha(
+  supabase: SupabaseClient,
+  nivel: "circuito" | "barrio",
+  codigo: string,
+): Promise<FichaTerritorial | null> {
+  const { data } = await supabase
+    .from("fichas_territoriales")
+    .select("nivel, codigo, segmento, problematica, mensaje, propuesta, abordaje, estado, actualizado_en")
+    .eq("nivel", nivel)
+    .eq("codigo", codigo)
+    .maybeSingle();
+  return (data as FichaTerritorial | null) ?? null;
+}
+
+export async function guardarFicha(supabase: SupabaseClient, ficha: FichaTerritorial): Promise<string | null> {
+  const { data: u } = await supabase.auth.getUser();
+  const { error } = await supabase.from("fichas_territoriales").upsert(
+    {
+      nivel: ficha.nivel,
+      codigo: ficha.codigo,
+      segmento: ficha.segmento.trim(),
+      problematica: ficha.problematica.trim(),
+      mensaje: ficha.mensaje.trim(),
+      propuesta: ficha.propuesta.trim(),
+      abordaje: ficha.abordaje.trim(),
+      estado: ficha.estado,
+      actualizado_por: u.user?.id ?? null,
+      actualizado_en: new Date().toISOString(),
+    },
+    { onConflict: "nivel,codigo" },
+  );
+  return error ? error.message : null;
+}
+
+// ── Índice de Oportunidad por circuito (vista "Oportunidad" del mapa) ────────
+
+export interface OportunidadCircuito {
+  circuito: string;
+  /** 0–100: 40% voto disperso 2023 + 35% bolsa 2025 (blancos+ausentes) + 25% competitividad 2025. */
+  indice: number;
+  votosDisperso: number;
+  dispersoPct: number;
+  blancos2025: number;
+  ausentes2025: number;
+  bolsaPct: number;
+  ganador2025: string;
+  diferencia2025: number;
+  competitividadPct: number;
+  electores: number;
+}
+
+const normalizar = (v: number, min: number, max: number) => (max > min ? (v - min) / (max - min) : 0);
+
+/**
+ * Índice de Oportunidad por circuito: dónde conviene invertir estructura.
+ * Cruza el voto disperso 2023 (la base propia potencial), la bolsa 2025
+ * (blancos + ausentes: votos que hoy no elige nadie) y qué tan peleado quedó
+ * el circuito en 2025. Todo agregado y con la cuenta a la vista.
+ */
+export async function calcularOportunidades(
+  supabase: SupabaseClient,
+  listasDisperso: number[],
+): Promise<OportunidadCircuito[]> {
+  const [mesasRes, ganadoresRes, universo] = await Promise.all([
+    // 1.350 mesas: el rango explícito esquiva el límite de 1.000 filas de PostgREST
+    supabase.from("mesas_2025").select("circuito, electores, blanco, total").range(0, 1999),
+    supabase.rpc("ganadores_espacios", {
+      p_eleccion: "2025",
+      p_categoria: "DIPUTADO NACIONAL",
+      p_nivel: "circuito",
+      p_orden: "votos",
+      p_limite: 60,
+    }),
+    listasDisperso.length > 0
+      ? obtenerUniversoTerritorial(supabase, { listas: listasDisperso, nivel: "circuito", limite: 60 })
+      : Promise.resolve([] as FilaUniverso[]),
+  ]);
+
+  const bolsa = new Map<string, { electores: number; blanco: number; total: number }>();
+  for (const m of (mesasRes.data as Array<{ circuito: string; electores: number; blanco: number; total: number }>) ?? []) {
+    const r = bolsa.get(m.circuito) ?? { electores: 0, blanco: 0, total: 0 };
+    r.electores += m.electores;
+    r.blanco += m.blanco;
+    r.total += m.total;
+    bolsa.set(m.circuito, r);
+  }
+
+  type Ganador = { espacio: string; ganador: string; diferencia: number; positivos: number };
+  const ganadores = new Map<string, Ganador>();
+  for (const g of (ganadoresRes.data as Ganador[]) ?? []) {
+    ganadores.set(g.espacio.replace(/^Circuito /, ""), g);
+  }
+
+  const disperso = new Map<string, { votos: number; pct: number }>();
+  for (const f of universo) {
+    if (f.circuito) disperso.set(f.circuito, { votos: Number(f.votos_universo), pct: Number(f.pct_universo) });
+  }
+
+  const filas: OportunidadCircuito[] = [];
+  for (const [circuito, b] of bolsa) {
+    const g = ganadores.get(circuito);
+    const d = disperso.get(circuito);
+    const ausentes = Math.max(0, b.electores - b.total);
+    filas.push({
+      circuito,
+      indice: 0,
+      votosDisperso: d?.votos ?? 0,
+      dispersoPct: d?.pct ?? 0,
+      blancos2025: b.blanco,
+      ausentes2025: ausentes,
+      bolsaPct: b.electores > 0 ? (100 * (b.blanco + ausentes)) / b.electores : 0,
+      ganador2025: g?.ganador ?? "?",
+      diferencia2025: Number(g?.diferencia ?? 0),
+      competitividadPct: g && Number(g.positivos) > 0 ? Math.max(0, 100 * (1 - Number(g.diferencia) / Number(g.positivos))) : 0,
+      electores: b.electores,
+    });
+  }
+
+  // Normalización min-max entre circuitos para que las tres patas pesen lo dicho
+  const dMin = Math.min(...filas.map((f) => f.votosDisperso)), dMax = Math.max(...filas.map((f) => f.votosDisperso));
+  const bMin = Math.min(...filas.map((f) => f.bolsaPct)), bMax = Math.max(...filas.map((f) => f.bolsaPct));
+  const cMin = Math.min(...filas.map((f) => f.competitividadPct)), cMax = Math.max(...filas.map((f) => f.competitividadPct));
+  for (const f of filas) {
+    f.indice = Math.round(
+      100 *
+        (0.4 * normalizar(f.votosDisperso, dMin, dMax) +
+          0.35 * normalizar(f.bolsaPct, bMin, bMax) +
+          0.25 * normalizar(f.competitividadPct, cMin, cMax)),
+    );
+  }
+  return filas.sort((a, b) => b.indice - a.indice);
+}
+
+// ── Comparador 2023 ↔ 2025 (vista "2023↔2025" del mapa) ─────────────────────
+
+export interface ListaEleccion {
+  lista_id: number;
+  lista: string;
+  votos: number;
+  pct: number;
+}
+
+/** Ranking de listas de una elección (para poblar los selectores del comparador). */
+export async function listarListasEleccion(
+  supabase: SupabaseClient,
+  eleccion: "2023" | "2025",
+  categoria = "CONCEJAL",
+): Promise<ListaEleccion[]> {
+  const { data } = await supabase.rpc("listas_eleccion", {
+    p_eleccion: eleccion,
+    p_categoria: eleccion === "2023" ? categoria : null,
+  });
+  return (data as ListaEleccion[]) ?? [];
+}
+
+export interface DeltaCircuito {
+  circuito: string;
+  votos_2023: number;
+  pct_2023: number;
+  votos_2025: number;
+  pct_2025: number;
+  delta_pct: number;
+}
+
+/** Delta de % por circuito entre una lista 2023 y una agrupación 2025. */
+export async function compararListasCircuitos(
+  supabase: SupabaseClient,
+  lista2023: number,
+  lista2025: number,
+  categoria2023 = "CONCEJAL",
+): Promise<DeltaCircuito[]> {
+  const { data, error } = await supabase.rpc("comparar_elecciones", {
+    p_lista_2023: lista2023,
+    p_lista_2025: lista2025,
+    p_categoria_2023: categoria2023,
+  });
+  if (error) throw new Error(error.message);
+  return (data as DeltaCircuito[]) ?? [];
+}
+
 export interface MesaPeleada {
   mesa: number;
   ganador: string;
