@@ -12,10 +12,10 @@ interface AccionMapa {
 }
 
 interface Mensaje {
-  rol: "usuario" | "migue";
+  rol: "usuario" | "elena";
   contenido: string;
   herramientas?: string[];
-  /** Migue pidió una acción visual en el mapa (seleccionar y encuadrar). */
+  /** Elena pidió una acción visual en el mapa (seleccionar y encuadrar). */
   accionMapa?: AccionMapa;
 }
 
@@ -44,8 +44,8 @@ const SUGERENCIAS = [
   "¿Cómo viene la estrategia contra la meta de 20.000?",
 ];
 
-/** Migue — el asistente del comando territorial — flotante en toda la app. */
-export function MigueChat() {
+/** Elena — el asistente del comando territorial — flotante en toda la app. */
+export function ElenaChat() {
   const [abierto, setAbierto] = useState(false);
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [texto, setTexto] = useState("");
@@ -59,7 +59,7 @@ export function MigueChat() {
   }, [mensajes, pensando]);
 
   /**
-   * Migue acciona el mapa: si ya estamos en el mapa dispara el evento que
+   * Elena acciona el mapa: si ya estamos en el mapa dispara el evento que
    * selecciona y encuadra; si no, navega con ?tipo=&codigo= — el layout
    * persiste, así que el chat queda abierto durante el viaje.
    */
@@ -79,7 +79,7 @@ export function MigueChat() {
     setTexto("");
     setPensando(true);
     try {
-      const res = await fetch("/api/migue", {
+      const res = await fetch("/api/elena", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ mensajes: nuevos.map(({ rol, contenido }) => ({ rol, contenido })) }),
@@ -93,7 +93,7 @@ export function MigueChat() {
       setMensajes((m) => [
         ...m,
         {
-          rol: "migue",
+          rol: "elena",
           contenido: data.respuesta ?? `Perdón, tuve un problema: ${data.error ?? "error desconocido"}. Probá de nuevo.`,
           herramientas: data.herramientas,
           accionMapa: data.accionMapa,
@@ -101,7 +101,7 @@ export function MigueChat() {
       ]);
       if (data.accionMapa) accionarMapa(data.accionMapa);
     } catch {
-      setMensajes((m) => [...m, { rol: "migue", contenido: "Se me cortó la conexión. ¿Probás de nuevo?" }]);
+      setMensajes((m) => [...m, { rol: "elena", contenido: "Se me cortó la conexión. ¿Probás de nuevo?" }]);
     } finally {
       setPensando(false);
     }
@@ -109,7 +109,7 @@ export function MigueChat() {
   const enviarRef = useRef(enviar);
   enviarRef.current = enviar;
 
-  // La app puede pedirle un análisis a Migue (ej: botón del panel del circuito):
+  // La app puede pedirle un análisis a Elena (ej: botón del panel del circuito):
   // abre el chat y manda la pregunta como si la hubiera escrito el usuario.
   useEffect(() => {
     const alPreguntar = (e: Event) => {
@@ -118,8 +118,8 @@ export function MigueChat() {
       setAbierto(true);
       void enviarRef.current(texto);
     };
-    window.addEventListener("jxr:migue-preguntar", alPreguntar);
-    return () => window.removeEventListener("jxr:migue-preguntar", alPreguntar);
+    window.addEventListener("jxr:elena-preguntar", alPreguntar);
+    return () => window.removeEventListener("jxr:elena-preguntar", alPreguntar);
   }, []);
 
   return (
@@ -130,10 +130,10 @@ export function MigueChat() {
           <button
             onClick={() => setAbierto(true)}
             className="flex items-center gap-2 rounded-full border border-rosa/40 bg-panel-2 py-2 pr-4 pl-2 shadow-2xl transition select-none hover:border-rosa hover:shadow-rosa/20"
-            title="Preguntale a Migue sobre el operativo territorial"
+            title="Preguntale a Elena sobre el operativo territorial"
           >
-            <Image src="/marca/migue.png" alt="Migue" width={36} height={36} className="rounded-full" />
-            <span className="text-sm font-semibold">Migue</span>
+            <Image src="/marca/elena.png" alt="Elena" width={36} height={36} className="rounded-full" />
+            <span className="text-sm font-semibold">Elena</span>
             <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-ok" />
           </button>
         </div>
@@ -144,12 +144,12 @@ export function MigueChat() {
         <div className="panel-vidrio fixed right-4 bottom-4 z-40 flex h-[540px] max-h-[calc(100vh-96px)] w-[380px] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-2xl">
           <div className="flex items-center justify-between border-b border-borde bg-panel-2/60 px-4 py-3">
             <div className="flex items-center gap-2.5">
-              <Image src="/marca/migue.png" alt="Migue" width={34} height={34} className="rounded-full" />
+              <Image src="/marca/elena.png" alt="Elena" width={34} height={34} className="rounded-full" />
               <div className="leading-tight">
-                <div className="text-sm font-bold">Migue</div>
+                <div className="text-sm font-bold">Elena</div>
                 <div className="flex items-center gap-1.5 text-[10px] text-texto-3">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-ok" />
-                  Online · experto en el operativo territorial
+                  Online · experta en el operativo territorial
                 </div>
               </div>
             </div>
@@ -162,7 +162,7 @@ export function MigueChat() {
             {mensajes.length === 0 && (
               <div className="space-y-2">
                 <p className="px-1 text-[13px] text-texto-2">
-                  ¡Hola! Soy Migue 👋 Preguntame lo que quieras del operativo: cobertura de distritos y
+                  ¡Hola! Soy Elena 👋 Preguntame lo que quieras del operativo: cobertura de distritos y
                   circuitos, personas asignadas, tareas pendientes…
                 </p>
                 {SUGERENCIAS.map((s) => (
@@ -205,8 +205,8 @@ export function MigueChat() {
             ))}
             {pensando && (
               <div className="flex items-center gap-2 px-1 text-xs text-texto-3">
-                <Image src="/marca/migue.png" alt="" width={20} height={20} className="animate-pulse rounded-full" />
-                Migue está consultando la base…
+                <Image src="/marca/elena.png" alt="" width={20} height={20} className="animate-pulse rounded-full" />
+                Elena está consultando la base…
               </div>
             )}
             <div ref={finRef} />
@@ -218,7 +218,7 @@ export function MigueChat() {
                 value={texto}
                 onChange={(e) => setTexto(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && void enviar(texto)}
-                placeholder="Preguntale a Migue…"
+                placeholder="Preguntale a Elena…"
                 className="flex-1 rounded-xl border border-borde-2 bg-panel-2 px-3 py-2.5 text-[13px] outline-none placeholder:text-texto-3 focus:border-rosa/50"
               />
               <button

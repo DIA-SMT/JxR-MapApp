@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { BotonSalir } from "@/components/boton-salir";
 import { BotonTema } from "@/components/boton-tema";
 import { LogoJxR } from "@/components/marca";
-import { MigueChat } from "@/components/migue-chat";
+import { ElenaChat } from "@/components/elena-chat";
 import { sesionConPerfil } from "@/lib/supabase/servidor";
 
 /**
@@ -73,7 +73,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
 
       <main className="relative flex-1 overflow-hidden">{children}</main>
 
-      <MigueChat />
+      <ElenaChat />
     </div>
   );
 }

@@ -987,7 +987,7 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
     };
   }, [verCalles, tema]);
 
-  // Migue (u otro link) acciona el mapa
+  // Elena (u otro link) acciona el mapa
   useEffect(() => {
     const alAccionar = (e: Event) => {
       const d = (e as CustomEvent<SeleccionEspacio>).detail;

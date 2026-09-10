@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { ejecutarHerramientaMigue, HERRAMIENTAS_MIGUE, SISTEMA_MIGUE } from "@/lib/migue";
+import { ejecutarHerramientaElena, HERRAMIENTAS_ELENA, SISTEMA_ELENA } from "@/lib/elena";
 import { esEspacioValido } from "@/lib/espacios";
 import { sesionConPerfil } from "@/lib/supabase/servidor";
 import type { TipoEspacio } from "@/lib/tipos";
@@ -8,7 +8,7 @@ import type { TipoEspacio } from "@/lib/tipos";
 export const maxDuration = 60;
 
 /**
- * Migue conversacional: loop de tool-calling (máx. 5 rondas) contra
+ * Elena conversacional: loop de tool-calling (máx. 5 rondas) contra
  * herramientas de solo lectura del operativo. Sesión obligatoria; las
  * consultas corren con la sesión RLS del usuario.
  */
@@ -17,7 +17,7 @@ const entradaSchema = z.object({
   mensajes: z
     .array(
       z.object({
-        rol: z.enum(["usuario", "migue"]),
+        rol: z.enum(["usuario", "elena"]),
         contenido: z.string().min(1).max(4000),
       }),
     )
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   if (!cuerpo.success) return NextResponse.json({ error: "mensajes inválidos" }, { status: 400 });
 
   const mensajes: MensajeOR[] = [
-    { role: "system", content: SISTEMA_MIGUE },
+    { role: "system", content: SISTEMA_ELENA },
     ...cuerpo.data.mensajes.slice(-12).map((m) => ({
       role: m.rol === "usuario" ? "user" : "assistant",
       content: m.contenido,
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 
   const modelo = process.env.OPENROUTER_MODEL ?? "anthropic/claude-haiku-4.5";
   const herramientasUsadas: string[] = [];
-  // Si Migue llama accionar_mapa, el espacio viaja al navegador y el mapa lo encuadra
+  // Si Elena llama accionar_mapa, el espacio viaja al navegador y el mapa lo encuadra
   let accionMapa: { tipo: TipoEspacio; codigo: string } | null = null;
 
   try {
@@ -61,14 +61,14 @@ export async function POST(req: NextRequest) {
         headers: {
           authorization: `Bearer ${apiKey}`,
           "content-type": "application/json",
-          "x-title": "JxR Migue",
+          "x-title": "JxR Elena",
         },
         body: JSON.stringify({
           model: modelo,
           max_tokens: 1200,
           temperature: 0.3,
           messages: mensajes,
-          tools: HERRAMIENTAS_MIGUE,
+          tools: HERRAMIENTAS_ELENA,
         }),
       });
       if (!res.ok) {
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
           }
           let resultado: unknown;
           try {
-            resultado = await ejecutarHerramientaMigue(sesion.supabase, llamada.function.name, argumentos);
+            resultado = await ejecutarHerramientaElena(sesion.supabase, llamada.function.name, argumentos);
           } catch (e) {
             resultado = { error: e instanceof Error ? e.message.slice(0, 200) : "error de consulta" };
           }
@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (e) {
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Migue no pudo responder" },
+      { error: e instanceof Error ? e.message : "Elena no pudo responder" },
       { status: 502 },
     );
   }

@@ -43,7 +43,7 @@ const TIER_ESTILO: Record<string, string> = {
  *    la meta. Responde "¿dónde actuamos primero?".
  *  · Escuelas por umbral — la mesa de trabajo original (~200 votos/escuela).
  * La meta SIEMPRE se mide en CONCEJAL con la selección de listas del equipo,
- * que ahora vive en la base (compartida entre pantallas, mapa y Migue).
+ * que ahora vive en la base (compartida entre pantallas, mapa y Elena).
  */
 export function Estrategia2023() {
   const supabase = useMemo(() => crearClienteNavegador(), []);
@@ -321,7 +321,7 @@ export function Estrategia2023() {
         <div className="mt-1 text-right text-[10px] text-texto-3">{avance}% de la meta</div>
       </div>
 
-      {/* Selección de listas (compartida con el mapa y Migue vía la base) */}
+      {/* Selección de listas (compartida con el mapa y Elena vía la base) */}
       <div className="panel-vidrio rounded-2xl p-3">
         <div className="flex flex-wrap items-center gap-3 text-xs">
           {tab === "umbral" && (
@@ -363,7 +363,7 @@ export function Estrategia2023() {
           >
             <RotateCcw size={10} /> Preselección peronismo disperso
           </button>
-          <span className="text-[10px] text-texto-3">La selección se guarda en la base: la ven todos y la usa Migue.</span>
+          <span className="text-[10px] text-texto-3">La selección se guarda en la base: la ven todos y la usa Elena.</span>
         </div>
 
         {verListas && (

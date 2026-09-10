@@ -143,17 +143,17 @@ export function PanelEspacio({
 
   const barriosDelCircuito = seleccion.tipo === "circuito" ? (BARRIOS_POR_CIRCUITO[seleccion.codigo] ?? []) : [];
 
-  // Consultar a Migue sobre ESTE circuito: pregunta libre o sugerencias
-  const [qMigue, setQMigue] = useState("");
-  const preguntarMigue = (texto: string) => {
+  // Consultar a Elena sobre ESTE circuito: pregunta libre o sugerencias
+  const [qElena, setQElena] = useState("");
+  const preguntarElena = (texto: string) => {
     const limpio = texto.trim();
     if (!limpio) return;
     window.dispatchEvent(
-      new CustomEvent("jxr:migue-preguntar", {
+      new CustomEvent("jxr:elena-preguntar", {
         detail: `Sobre el circuito ${seleccion.codigo}: ${limpio}`,
       }),
     );
-    setQMigue("");
+    setQElena("");
   };
   const SUGERENCIAS_CIRCUITO = [
     "hacé el análisis estratégico completo: 2023, 2025, competitividad, blancos, ausentes y qué acción conviene",
@@ -281,7 +281,7 @@ export function PanelEspacio({
     });
 
   return (
-    // bottom 76px: deja libre el botón flotante de Migue (z-40), que si no tapa el formulario
+    // bottom 76px: deja libre el botón flotante de Elena (z-40), que si no tapa el formulario
     <aside className="panel-vidrio absolute top-3 right-3 bottom-[76px] z-20 flex w-[360px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-2xl">
       <div className="flex items-center justify-between border-b border-borde bg-panel-2/60 px-4 py-3">
         <div>
@@ -694,25 +694,25 @@ export function PanelEspacio({
           </div>
         )}
 
-        {/* ── Consultarle a Migue sobre este circuito (libre o sugerido) ── */}
+        {/* ── Consultarle a Elena sobre este circuito (libre o sugerido) ── */}
         {seleccion.tipo === "circuito" && (
           <div className="rounded-xl border border-rosa/30 bg-rosa/5 p-3">
             <div className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-rosa uppercase">
-              <Sparkles size={12} /> Preguntale a Migue sobre este circuito
+              <Sparkles size={12} /> Preguntale a Elena sobre este circuito
             </div>
             <div className="mt-2 flex items-center gap-1.5">
               <input
-                value={qMigue}
-                onChange={(e) => setQMigue(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && preguntarMigue(qMigue)}
+                value={qElena}
+                onChange={(e) => setQElena(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && preguntarElena(qElena)}
                 placeholder={`Lo que quieras del ${seleccion.codigo}: mesas, blancos, rivales…`}
                 className="min-w-0 flex-1 rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-[11px] outline-none placeholder:text-texto-3 focus:border-rosa/50"
               />
               <button
-                onClick={() => preguntarMigue(qMigue)}
-                disabled={qMigue.trim() === ""}
+                onClick={() => preguntarElena(qElena)}
+                disabled={qElena.trim() === ""}
                 className="rounded-lg bg-rosa px-2.5 py-2 text-[11px] font-bold text-white transition hover:brightness-110 disabled:opacity-40"
-                title="Migue responde con los datos reales de este circuito"
+                title="Elena responde con los datos reales de este circuito"
               >
                 <Sparkles size={12} />
               </button>
@@ -721,7 +721,7 @@ export function PanelEspacio({
               {SUGERENCIAS_CIRCUITO.map((s) => (
                 <button
                   key={s}
-                  onClick={() => preguntarMigue(s)}
+                  onClick={() => preguntarElena(s)}
                   className="block w-full rounded-lg border border-borde bg-panel-2/60 px-2 py-1.5 text-left text-[10px] text-texto-2 transition hover:border-rosa/50 hover:text-texto"
                 >
                   {s}

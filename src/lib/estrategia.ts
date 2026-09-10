@@ -51,7 +51,7 @@ export function guardarSeleccion(categoria: string, listas: number[]) {
 }
 
 // ── Selección compartida en la base (tabla estrategia_listas) ────────────────
-// Una sola verdad para la pantalla Estrategia, el mapa y Migue. localStorage
+// Una sola verdad para la pantalla Estrategia, el mapa y Elena. localStorage
 // queda como cache/fallback si la base aún no tiene selección guardada.
 
 export async function leerSeleccionDB(supabase: SupabaseClient, categoria: string): Promise<number[] | null> {

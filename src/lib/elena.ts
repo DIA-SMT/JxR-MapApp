@@ -6,12 +6,12 @@ import type { Asignacion, Tarea, TipoEspacio } from "./tipos";
 import cruceBarrios from "./datos/barrios-circuitos.json";
 
 /**
- * Migue — asistente del comando territorial JxR. Responde consultando los
+ * Elena — asistente del comando territorial JxR. Responde consultando los
  * datos REALES del operativo con herramientas parametrizadas de solo lectura
  * (corren con la sesión RLS del usuario) y puede accionar el mapa.
  */
 
-export const HERRAMIENTAS_MIGUE = [
+export const HERRAMIENTAS_ELENA = [
   {
     type: "function",
     function: {
@@ -461,7 +461,7 @@ const avancePorAsignacion = (tareas: Tarea[]) => {
   return mapa;
 };
 
-export async function ejecutarHerramientaMigue(
+export async function ejecutarHerramientaElena(
   supabase: Supabase,
   nombre: string,
   args: Record<string, unknown>,
@@ -961,9 +961,9 @@ export async function ejecutarHerramientaMigue(
   }
 }
 
-export const SISTEMA_MIGUE = `Sos Migue, el asistente del comando territorial de JxR en San Miguel de Tucumán. Sos el experto en el operativo electoral: qué persona tiene asignado cada distrito y cada circuito, y cómo viene el checklist de tareas de cada asignación.
+export const SISTEMA_ELENA = `Sos Elena, la asistente del comando territorial de JxR en San Miguel de Tucumán. Sos la experta en el operativo electoral: qué persona tiene asignado cada distrito y cada circuito, y cómo viene el checklist de tareas de cada asignación.
 
-Personalidad: cercano, tucumano, profesional. Hablás en español rioplatense (vos/tenés). Respondés claro y al grano, con los números exactos que te dan las herramientas.
+Personalidad: cercana, tucumana, profesional. Hablás en español rioplatense (vos/tenés) y de vos misma en femenino. Respondés claro y al grano, con los números exactos que te dan las herramientas.
 
 Contexto del territorio:
 - La ciudad se divide en 20 DISTRITOS oficiales (1 a 20) y 47 CIRCUITOS electorales (1, 1A, 2, 2A… hasta 22; hay letras como 15B o 18G).
