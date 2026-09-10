@@ -154,3 +154,12 @@ body {
 .maplibregl-ctrl-attrib a {
   color: var(--t-texto-3) !important;
 }
+
+/* Menús desplegables sobre contenido: opacos, para que se lean sin
+   competir con el mapa o las tablas que quedan detrás. */
+.panel-solido {
+  background: var(--t-panel);
+  backdrop-filter: blur(18px) saturate(1.2);
+  border: 1px solid var(--t-borde);
+  box-shadow: 0 12px 40px var(--t-sombra);
+}

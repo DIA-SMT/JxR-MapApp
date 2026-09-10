@@ -98,7 +98,8 @@ export function PanelEscuela({
   };
 
   return (
-    <aside className="panel-vidrio absolute top-3 right-3 bottom-[76px] z-20 flex w-[380px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-2xl">
+    // Hoja inferior en pantallas chicas, panel lateral desde sm (ver panel-espacio)
+    <aside className="panel-vidrio absolute inset-x-0 bottom-0 z-20 flex max-h-[68vh] flex-col overflow-hidden rounded-t-2xl sm:inset-x-auto sm:top-3 sm:right-3 sm:bottom-[76px] sm:max-h-none sm:w-[380px] sm:rounded-2xl">
       <div className="flex items-start justify-between gap-2 border-b border-borde bg-panel-2/60 px-4 py-3">
         <div>
           <div className="flex items-center gap-1.5 text-[10px] font-bold tracking-wide text-texto-2 uppercase">
@@ -123,7 +124,8 @@ export function PanelEscuela({
         </button>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
+      {/* pb extra en mobile: el botón flotante de Elena queda sobre la hoja */}
+      <div className="flex-1 space-y-3 overflow-y-auto px-3 py-3 pb-20 sm:pb-3">
         {/* Voto disperso en esta escuela */}
         <div className={`rounded-xl border p-3 ${enEstrategia ? "border-rosa/50 bg-rosa/10" : "border-borde bg-panel-2/70"}`}>
           <div className="flex items-center justify-between gap-2">

@@ -223,8 +223,9 @@ export function UniversoTerritorial() {
       {/* Tabla territorial */}
       {filas.length > 0 && (
         <div className="panel-vidrio overflow-hidden rounded-2xl">
-          <div className="max-h-[560px] overflow-y-auto">
-            <table className="w-full text-xs">
+          {/* overflow-x + min-w: la tabla se desliza en pantallas chicas */}
+          <div className="max-h-[560px] overflow-auto">
+            <table className="w-full min-w-[620px] text-xs">
               <thead className="sticky top-0 bg-panel-2 text-left text-[10px] text-texto-3 uppercase">
                 <tr>
                   <th className="px-3 py-2 font-semibold">

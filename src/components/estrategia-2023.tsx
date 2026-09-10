@@ -278,7 +278,7 @@ export function Estrategia2023() {
             <div className="text-[11px] text-texto-2">{universo.n} escuelas marcadas para trabajar</div>
           </div>
           {tab === "umbral" && (
-            <div className="text-right text-[11px] text-texto-2">
+            <div className="text-[11px] text-texto-2 sm:text-right">
               <div>
                 Visibles con este umbral: <b className="num text-texto">{filtradasReales.length}</b> escuelas reales ·{" "}
                 <b className="num text-texto">{numero(votosVisibles)}</b> votos
@@ -303,7 +303,7 @@ export function Estrategia2023() {
             </div>
           )}
           {tab === "frontera" && (
-            <div className="text-right text-[11px] leading-relaxed text-texto-2">
+            <div className="text-[11px] leading-relaxed text-texto-2 sm:text-right">
               <div>
                 Frontera: <b className="num text-texto">{kpisFrontera.escuelas}</b> escuelas suman{" "}
                 <b className="num text-texto">{numero(kpisFrontera.votos)}</b> votos
@@ -393,7 +393,7 @@ export function Estrategia2023() {
       {/* ── Pestaña Frontera 20K ── */}
       {tab === "frontera" && (
         <div className={`panel-vidrio overflow-x-auto rounded-2xl transition ${recalculando ? "opacity-50" : ""}`}>
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[640px] text-left text-xs">
             <thead>
               <tr className="border-b border-borde text-[10px] tracking-wide text-texto-3 uppercase">
                 <th className="px-3 py-2">Tier</th>
@@ -482,7 +482,7 @@ export function Estrategia2023() {
       {/* ── Pestaña Escuelas por umbral ── */}
       {tab === "umbral" && (
         <div className={`panel-vidrio overflow-x-auto rounded-2xl transition ${recalculando ? "opacity-50" : ""}`}>
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[640px] text-left text-xs">
             <thead>
               <tr className="border-b border-borde text-[10px] tracking-wide text-texto-3 uppercase">
                 <th className="px-3 py-2">Trabajar</th>

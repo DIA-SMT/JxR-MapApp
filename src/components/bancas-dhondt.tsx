@@ -307,8 +307,10 @@ export function BancasDHondt() {
 
           {/* Tabla de reparto */}
           <div className="panel-vidrio overflow-hidden rounded-2xl">
-            <div className="max-h-[520px] overflow-y-auto">
-              <table className="w-full text-xs">
+            {/* overflow-x + min-w: en pantallas chicas la tabla se desliza en
+                lugar de comprimir las columnas hasta volverlas ilegibles */}
+            <div className="max-h-[520px] overflow-auto">
+              <table className="w-full min-w-[560px] text-xs">
                 <thead className="sticky top-0 bg-panel-2 text-left text-[10px] text-texto-3 uppercase">
                   <tr>
                     <th className="px-3 py-2 font-semibold">Unir</th>

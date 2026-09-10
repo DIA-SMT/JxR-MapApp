@@ -282,7 +282,9 @@ export function PanelEspacio({
 
   return (
     // bottom 76px: deja libre el botón flotante de Elena (z-40), que si no tapa el formulario
-    <aside className="panel-vidrio absolute top-3 right-3 bottom-[76px] z-20 flex w-[360px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-2xl">
+    // En pantallas chicas es una hoja inferior (deja ver el mapa arriba, que es
+    // el punto de tener un mapa); desde sm vuelve a ser el panel lateral.
+    <aside className="panel-vidrio absolute inset-x-0 bottom-0 z-20 flex max-h-[68vh] flex-col overflow-hidden rounded-t-2xl sm:inset-x-auto sm:top-3 sm:right-3 sm:bottom-[76px] sm:max-h-none sm:w-[360px] sm:rounded-2xl">
       <div className="flex items-center justify-between border-b border-borde bg-panel-2/60 px-4 py-3">
         <div>
           <div className="text-sm font-extrabold">
@@ -500,8 +502,8 @@ export function PanelEspacio({
                   {mesas2025.length} mesas · las más peleadas primero {verMesas25 ? "▴" : "▾"}
                 </button>
                 {verMesas25 && (
-                  <div className="mt-1.5 max-h-44 overflow-y-auto">
-                    <table className="w-full text-[10px]">
+                  <div className="mt-1.5 max-h-44 overflow-auto">
+                    <table className="w-full min-w-[300px] text-[10px]">
                       <thead className="sticky top-0 bg-panel-2 text-left text-texto-3">
                         <tr>
                           <th className="py-0.5 pr-1 font-semibold">Mesa</th>
@@ -810,7 +812,8 @@ export function PanelEspacio({
       </div>
 
       {/* Asignar persona */}
-      <div className="border-t border-borde bg-panel-2/60 p-3">
+      {/* pb extra en mobile: el botón flotante de Elena queda sobre la hoja */}
+      <div className="border-t border-borde bg-panel-2/60 p-3 pb-20 sm:pb-3">
         <div className="mb-1.5 flex items-center justify-between">
           <span className="text-[11px] font-bold tracking-wide text-texto-2 uppercase">
             Asignar persona

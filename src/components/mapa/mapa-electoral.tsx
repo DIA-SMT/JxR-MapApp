@@ -1,7 +1,7 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import { Box, Building2, Layers, Route, Satellite, Waypoints } from "lucide-react";
+import { Box, Building2, Check, Info, Layers, Route, Satellite, Waypoints, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Layer,
@@ -619,6 +619,14 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
   const [verCalles, setVerCalles] = useState(true);
   const [verBarrios, setVerBarrios] = useState(false);
   const [barrioResaltado, setBarrioResaltado] = useState<string | null>(null);
+  const [menuCapas, setMenuCapas] = useState(false);
+  const [verLeyenda, setVerLeyenda] = useState(true);
+
+  // En pantallas chicas la leyenda arranca cerrada (tapa demasiado mapa).
+  // Se decide en el cliente para no romper el HTML del servidor.
+  useEffect(() => {
+    if (window.innerWidth < 640) setVerLeyenda(false);
+  }, []);
   const [hayAnclaEtiquetas, setHayAnclaEtiquetas] = useState(true);
   const [aviso, setAviso] = useState<string | null>(null);
   const [usuarioId, setUsuarioId] = useState<string | null>(null);
@@ -1102,6 +1110,68 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
   const tipoContexto: TipoEspacio = tipoActivo === "distrito" ? "circuito" : "distrito";
   const c = COLORES[tema];
 
+  /** Las capas del mapa, una sola definición para la barra y el menú "Capas". */
+  const capas = [
+    {
+      clave: "3d",
+      etiqueta: "3D",
+      icono: Box,
+      activa: ver3D,
+      claseActiva: "bg-amarillo/20 text-amarillo",
+      alternar: alternar3D,
+      titulo: "Vista 3D: la altura es la métrica de la vista (cobertura, electores o votos 2023)",
+    },
+    ...(vista === "operativo"
+      ? [
+          {
+            clave: "cobertura",
+            etiqueta: "Cobertura",
+            icono: Layers,
+            activa: verCobertura,
+            claseActiva: "bg-panel-3 text-texto",
+            alternar: () => setVerCobertura((v) => !v),
+            titulo: "Pintar cada espacio según su estado: sin asignar / en curso / completo",
+          },
+        ]
+      : []),
+    {
+      clave: "avenidas",
+      etiqueta: "Avenidas",
+      icono: Route,
+      activa: verAvenidas,
+      claseActiva: "bg-panel-3 text-texto",
+      alternar: () => setVerAvenidas((v) => !v),
+      titulo: "Realzar avenidas y corredores principales",
+    },
+    {
+      clave: "calles",
+      etiqueta: "Calles",
+      icono: Waypoints,
+      activa: verCalles,
+      claseActiva: "bg-panel-3 text-texto",
+      alternar: () => setVerCalles((v) => !v),
+      titulo: "Nombres de todas las calles al acercar el zoom (las trazas quedan siempre realzadas)",
+    },
+    {
+      clave: "barrios",
+      etiqueta: "Barrios",
+      icono: Building2,
+      activa: verBarrios,
+      claseActiva: "bg-panel-3 text-texto",
+      alternar: () => setVerBarrios((v) => !v),
+      titulo: "Límites y nombres de los 327 barrios oficiales (mapa municipal)",
+    },
+    {
+      clave: "satelite",
+      etiqueta: "Satélite",
+      icono: Satellite,
+      activa: verSatelite,
+      claseActiva: "bg-panel-3 text-texto",
+      alternar: () => setVerSatelite((v) => !v),
+      titulo: "Imagen satelital real (Esri) — los nombres de calles quedan encima",
+    },
+  ];
+
   const capasInteractivas =
     vista === "escuelas"
       ? ["escuelas-puntos", ver3D ? `${tipoActivo}-3d` : `${tipoActivo}-relleno`]
@@ -1219,15 +1289,20 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
         )}
       </MapaGL>
 
-      {/* ── Barra superior ── */}
-      <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-24px)] flex-wrap items-center gap-2">
-        <div className="panel-vidrio pointer-events-auto flex overflow-hidden rounded-xl text-xs font-bold">
+      {/* ── Controles del mapa ──
+          Todo en UNA columna: con dos bloques absolutos de `top` fijo, al
+          envolverse la primera fila en pantallas chicas la segunda quedaba
+          encima. Así las filas se apilan solas en cualquier ancho. */}
+      <div className="pointer-events-none absolute top-3 right-3 left-3 z-10 flex flex-col items-start gap-1.5">
+        <div className="flex w-full flex-wrap items-center gap-2">
+        {/* Vistas: deslizables cuando no caben, en lugar de cortarse */}
+        <div className="panel-vidrio pointer-events-auto flex max-w-full overflow-x-auto rounded-xl text-xs font-bold">
           {(Object.keys(VISTAS) as Vista[]).map((v) => (
             <button
               key={v}
               onClick={() => setVista(v)}
               title={VISTAS[v].descripcion}
-              className={`px-3 py-2 transition ${vista === v ? "bg-rosa/25 text-rosa" : "text-texto-3 hover:text-texto"}`}
+              className={`shrink-0 px-3 py-2 transition ${vista === v ? "bg-rosa/25 text-rosa" : "text-texto-3 hover:text-texto"}`}
             >
               {VISTAS[v].etiqueta}
             </button>
@@ -1254,90 +1329,81 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
           ))}
         </div>
 
-        <div className="panel-vidrio pointer-events-auto flex items-center gap-1 rounded-xl p-1 text-xs">
-          <button
-            onClick={alternar3D}
-            title="Vista 3D: la altura es la métrica de la vista (cobertura, electores o votos 2023)"
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold transition ${
-              ver3D ? "bg-amarillo/20 text-amarillo" : "text-texto-3 hover:text-texto"
-            }`}
-          >
-            <Box size={12} /> 3D
-          </button>
-          {vista === "operativo" && (
+        {/* Capas: en línea cuando hay ancho; si no, detrás del botón "Capas" */}
+        <div className="panel-vidrio pointer-events-auto hidden items-center gap-1 rounded-xl p-1 text-xs xl:flex">
+          {capas.map((c) => (
             <button
-              onClick={() => setVerCobertura((v) => !v)}
-              title="Pintar cada espacio según su estado: sin asignar / en curso / completo"
+              key={c.clave}
+              onClick={c.alternar}
+              title={c.titulo}
               className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold transition ${
-                verCobertura ? "bg-panel-3 text-texto" : "text-texto-3 hover:text-texto"
+                c.activa ? c.claseActiva : "text-texto-3 hover:text-texto"
               }`}
             >
-              <Layers size={12} /> Cobertura
+              <c.icono size={12} /> {c.etiqueta}
             </button>
+          ))}
+        </div>
+
+        <div className="pointer-events-auto relative xl:hidden">
+          <button
+            onClick={() => setMenuCapas((v) => !v)}
+            title="Capas del mapa: 3D, cobertura, avenidas, calles, barrios y satélite"
+            className={`panel-vidrio flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition ${
+              menuCapas ? "text-rosa" : "text-texto-2"
+            }`}
+          >
+            <Layers size={12} /> Capas
+            <span className="num rounded-full bg-panel-3 px-1.5 text-[10px]">{capas.filter((c) => c.activa).length}</span>
+          </button>
+          {menuCapas && (
+            <div className="panel-solido absolute top-full left-0 z-30 mt-1 flex w-48 flex-col gap-0.5 rounded-xl p-1 text-xs">
+              {capas.map((c) => (
+                <button
+                  key={c.clave}
+                  onClick={c.alternar}
+                  className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-left font-semibold transition ${
+                    c.activa ? c.claseActiva : "text-texto-3 hover:bg-panel-3 hover:text-texto"
+                  }`}
+                >
+                  <c.icono size={13} /> {c.etiqueta}
+                  {c.activa && <Check size={12} className="ml-auto" />}
+                </button>
+              ))}
+            </div>
           )}
-          <button
-            onClick={() => setVerAvenidas((v) => !v)}
-            title="Realzar avenidas y corredores principales"
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold transition ${
-              verAvenidas ? "bg-panel-3 text-texto" : "text-texto-3 hover:text-texto"
-            }`}
-          >
-            <Route size={12} /> Avenidas
-          </button>
-          <button
-            onClick={() => setVerCalles((v) => !v)}
-            title="Nombres de todas las calles al acercar el zoom (las trazas quedan siempre realzadas)"
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold transition ${
-              verCalles ? "bg-panel-3 text-texto" : "text-texto-3 hover:text-texto"
-            }`}
-          >
-            <Waypoints size={12} /> Calles
-          </button>
-          <button
-            onClick={() => setVerBarrios((v) => !v)}
-            title="Límites y nombres de los 327 barrios oficiales (mapa municipal) — para nombrar el territorio como lo conoce la gente"
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold transition ${
-              verBarrios ? "bg-panel-3 text-texto" : "text-texto-3 hover:text-texto"
-            }`}
-          >
-            <Building2 size={12} /> Barrios
-          </button>
-          <button
-            onClick={() => setVerSatelite((v) => !v)}
-            title="Imagen satelital real (Esri) — los nombres de calles quedan encima"
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold transition ${
-              verSatelite ? "bg-panel-3 text-texto" : "text-texto-3 hover:text-texto"
-            }`}
-          >
-            <Satellite size={12} /> Satélite
-          </button>
         </div>
 
         <BusquedaInteligente supabase={supabase} escuelas={escuelas} barrios={BARRIOS} onAccion={ejecutarAccion} onAviso={avisar} />
-      </div>
+        </div>
 
-      {/* ── Segunda fila: KPIs + microsegmentación ── */}
-      <div className="pointer-events-none absolute top-[52px] left-3 z-10 mt-1 flex max-w-[calc(100%-24px)] flex-wrap items-center gap-2">
-        <div className="panel-vidrio pointer-events-auto flex items-center gap-4 rounded-xl px-4 py-2 text-xs">
+      {/* ── Segunda fila: KPIs + microsegmentación (misma columna que la barra) ── */}
+      <div className="flex w-full flex-wrap items-center gap-2">
+        <div className="panel-vidrio pointer-events-auto flex max-w-full items-center gap-3 overflow-x-auto rounded-xl px-3 py-2 text-xs sm:gap-4 sm:px-4">
           {resumen && (
             <span title="Electores del padrón de la Capital">
+            
               <span className="num font-bold text-texto">{numero(resumen.total)}</span>
               <span className="text-texto-3"> electores</span>
             </span>
           )}
           <span title="Distritos con al menos una persona asignada">
+            
             <span className="num font-bold text-distrito">{kpis.distritosCubiertos}</span>
             <span className="text-texto-3">/20 distritos</span>
           </span>
           <span title="Circuitos con al menos una persona asignada">
+            
             <span className="num font-bold text-circuito">{kpis.circuitosCubiertos}</span>
             <span className="text-texto-3">/47 circuitos</span>
           </span>
           <span title="Personas con al menos un espacio asignado">
+            
             <span className="num font-bold text-rosa">{kpis.personasAsignadas}</span>
             <span className="text-texto-3"> personas</span>
           </span>
           <span title="Tareas completadas sobre el total del checklist">
+            
             <span className="num font-bold text-amarillo">{kpis.tareasHechas}</span>
             <span className="text-texto-3">/{kpis.tareasTotal} tareas</span>
           </span>
@@ -1395,6 +1461,7 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
             </button>
           </div>
         )}
+        </div>
       </div>
 
       {/* ── Aviso de la búsqueda/acciones ── */}
@@ -1404,8 +1471,28 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
         </div>
       )}
 
-      {/* ── Leyenda ── */}
-      <div className="panel-vidrio absolute bottom-8 left-3 z-10 max-w-64 rounded-xl px-3 py-2.5 text-[10px] leading-relaxed">
+      {/* ── Leyenda ──
+          Se puede colapsar: en pantallas chicas tapaba buena parte del mapa,
+          así que arranca cerrada ahí y abierta cuando hay lugar. */}
+      {!verLeyenda && (
+        <button
+          onClick={() => setVerLeyenda(true)}
+          title="Mostrar la leyenda del mapa"
+          className="panel-vidrio absolute bottom-8 left-3 z-10 flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[10px] font-bold text-texto-2"
+        >
+          <Info size={11} /> Leyenda
+        </button>
+      )}
+      <div
+        className={`panel-vidrio absolute bottom-8 left-3 z-10 max-w-64 rounded-xl px-3 py-2.5 text-[10px] leading-relaxed ${verLeyenda ? "" : "hidden"}`}
+      >
+        <button
+          onClick={() => setVerLeyenda(false)}
+          title="Ocultar la leyenda"
+          className="absolute top-1.5 right-1.5 text-texto-3 transition hover:text-texto"
+        >
+          <X size={11} />
+        </button>
         {vista === "operativo" && (
           <>
             <div className="mb-1 font-bold tracking-wide text-texto-2 uppercase">Cobertura</div>
