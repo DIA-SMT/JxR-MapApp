@@ -7,6 +7,87 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * numeración de mesas nacionales no es la del padrón provincial).
  */
 
+// ── Universos de listas (estrategia 2027) ───────────────────────────────────
+
+export type NivelTerritorial = "barrio" | "circuito" | "escuela" | "mesa";
+
+export interface FilaUniverso {
+  espacio: string;
+  circuito: string | null;
+  votos_universo: number;
+  positivos: number;
+  pct_universo: number;
+  electores: number;
+  votantes: number;
+  blancos: number;
+  ausentes: number;
+  participacion_pct: number;
+  listas_con_votos: number;
+  mesas: number;
+}
+
+export interface UniversoGuardado {
+  nombre: string;
+  listas: Array<{ numero: number; referente: string | null }>;
+}
+
+/** Universos de listas guardados y compartidos por el equipo. */
+export async function listarUniversos(supabase: SupabaseClient, categoria = "CONCEJAL"): Promise<UniversoGuardado[]> {
+  const { data } = await supabase
+    .from("universos_listas")
+    .select("nombre, lista_numero, referente")
+    .eq("categoria", categoria)
+    .order("nombre");
+  const mapa = new Map<string, UniversoGuardado>();
+  for (const f of (data as Array<{ nombre: string; lista_numero: number; referente: string | null }>) ?? []) {
+    const u = mapa.get(f.nombre) ?? { nombre: f.nombre, listas: [] };
+    u.listas.push({ numero: f.lista_numero, referente: f.referente });
+    mapa.set(f.nombre, u);
+  }
+  return [...mapa.values()];
+}
+
+/** Distribución territorial de un universo de listas (barrio/circuito/escuela/mesa). */
+export async function obtenerUniversoTerritorial(
+  supabase: SupabaseClient,
+  opciones: { categoria?: string; listas: number[]; nivel: NivelTerritorial; limite?: number },
+): Promise<FilaUniverso[]> {
+  const { data, error } = await supabase.rpc("universo_territorial", {
+    p_categoria: opciones.categoria ?? "CONCEJAL",
+    p_listas: opciones.listas,
+    p_nivel: opciones.nivel,
+    p_universo: null,
+    p_eleccion: "2023",
+    p_limite: opciones.limite ?? 400,
+  });
+  if (error) throw new Error(error.message);
+  return (data as FilaUniverso[]) ?? [];
+}
+
+export interface FilaUniversoLista {
+  lista_numero: number;
+  lista: string;
+  votos: number;
+  pct_positivos: number;
+  mesas: number;
+}
+
+/** Desglose lista por lista del universo, dentro de un espacio (o toda la ciudad). */
+export async function obtenerUniversoPorLista(
+  supabase: SupabaseClient,
+  opciones: { categoria?: string; listas: number[]; nivel: NivelTerritorial; codigo: string | null },
+): Promise<FilaUniversoLista[]> {
+  const { data, error } = await supabase.rpc("universo_por_lista", {
+    p_categoria: opciones.categoria ?? "CONCEJAL",
+    p_listas: opciones.listas,
+    p_nivel: opciones.nivel,
+    p_codigo: opciones.codigo,
+    p_universo: null,
+  });
+  if (error) throw new Error(error.message);
+  return (data as FilaUniversoLista[]) ?? [];
+}
+
 export interface FilaRankingEspacio {
   posicion: number;
   lista_id: number;
