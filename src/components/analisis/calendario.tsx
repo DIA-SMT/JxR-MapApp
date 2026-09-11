@@ -145,7 +145,7 @@ export function Calendario({ supabase }: { supabase: SupabaseClient }) {
         <div className="panel-vidrio rounded-2xl p-4">
           <div className="overflow-auto">
             <table className="w-full min-w-[720px] text-[11px]">
-              <thead className="text-left text-texto-3">
+              <thead className="sticky top-0 z-10 bg-panel/95 text-left text-texto-3 backdrop-blur">
                 <tr>
                   <th className="py-1 pr-2 font-semibold">Plazo</th>
                   <th className="py-1 pr-2 font-semibold">Hito</th>

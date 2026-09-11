@@ -1621,31 +1621,31 @@ export function MapaElectoral({ inicial }: { inicial?: InicialMapa | null }) {
 
       {/* ── Segunda fila: KPIs + microsegmentación (misma columna que la barra) ── */}
       <div className="flex w-full flex-wrap items-center gap-2">
-        <div className="panel-vidrio pointer-events-auto flex max-w-full items-center gap-3 overflow-x-auto rounded-xl px-3 py-2 text-xs sm:gap-4 sm:px-4">
+        {/* Flota sobre el mapa: las cifras van en una línea con separadores finos,
+            no apiladas, para no comerle alto al mapa. */}
+        <div className="panel-vidrio pointer-events-auto flex max-w-full items-center overflow-x-auto rounded-xl px-3 py-2 text-xs sm:px-4 [&>span]:border-l [&>span]:border-borde [&>span]:px-3 [&>span]:first:border-l-0 [&>span]:first:pl-0 sm:[&>span]:px-3.5">
           {resumen && (
-            <span title="Electores del padrón de la Capital">
-            
+            <span className="shrink-0 whitespace-nowrap" title="Electores del padrón de la Capital">
               <span className="num font-bold text-texto">{numero(resumen.total)}</span>
               <span className="text-texto-3"> electores</span>
             </span>
           )}
-          <span title="Distritos con al menos una persona asignada">
-            
+          <span className="shrink-0 whitespace-nowrap" title="Distritos con al menos una persona asignada">
             <span className="num font-bold text-distrito">{kpis.distritosCubiertos}</span>
             <span className="text-texto-3">/20 distritos</span>
           </span>
-          <span title="Circuitos con al menos una persona asignada">
-            
+          <span className="shrink-0 whitespace-nowrap" title="Circuitos con al menos una persona asignada">
             <span className="num font-bold text-circuito">{kpis.circuitosCubiertos}</span>
             <span className="text-texto-3">/47 circuitos</span>
           </span>
-          <span title="Personas con al menos un espacio asignado">
-            
+          <span className="shrink-0 whitespace-nowrap" title="Personas con al menos un espacio asignado">
             <span className="num font-bold text-rosa">{kpis.personasAsignadas}</span>
-            <span className="text-texto-3"> personas</span>
+            <span className="text-texto-3">
+              {" "}
+              {kpis.personasAsignadas === 1 ? "persona" : "personas"}
+            </span>
           </span>
-          <span title="Tareas completadas sobre el total del checklist">
-            
+          <span className="shrink-0 whitespace-nowrap" title="Tareas completadas sobre el total del checklist">
             <span className="num font-bold text-amarillo">{kpis.tareasHechas}</span>
             <span className="text-texto-3">/{kpis.tareasTotal} tareas</span>
           </span>

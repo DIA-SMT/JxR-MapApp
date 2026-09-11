@@ -10,6 +10,7 @@ import {
   Pencil,
   Plus,
   Save,
+  Search,
   Square,
   Trash2,
   Users,
@@ -20,6 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import { etiquetaEspacio } from "@/lib/espacios";
 import { useTerritorio } from "@/lib/territorio";
 import type { Persona } from "@/lib/tipos";
+import { Vacio } from "@/components/ui/vacio";
 
 /**
  * ABM de personas del operativo. Las personas NO son usuarios del sistema:
@@ -221,7 +223,15 @@ export function PersonasAdmin() {
       <div className="space-y-2">
         {cargando && <p className="text-sm text-texto-3">Cargando…</p>}
         {!cargando && filtradas.length === 0 && (
-          <p className="text-sm text-texto-3">No hay personas {busqueda ? "que coincidan" : "cargadas todavía"}.</p>
+          <Vacio
+            icono={busqueda ? Search : Users}
+            titulo={busqueda ? "Ninguna persona coincide" : "Todavía no cargaste a nadie"}
+            variante={busqueda ? "filtro" : "inicial"}
+          >
+            {busqueda
+              ? "Se busca por nombre, DNI, teléfono, dirección y email."
+              : "Acá va la gente real del operativo: referentes, punteros, fiscales. Cargá una con el formulario de arriba y después asignale distritos o circuitos desde el mapa."}
+          </Vacio>
         )}
         {filtradas.map((p) => {
           const r = porPersona.get(p.id);

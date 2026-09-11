@@ -14,6 +14,7 @@ import {
 } from "@/lib/diad";
 import { crearClienteNavegador } from "@/lib/supabase/cliente";
 import type { Persona } from "@/lib/tipos";
+import { Cifra, CifraSiHay } from "@/components/ui/cifras";
 import { Escrutinio } from "./escrutinio";
 import { Fiscales } from "./fiscales";
 import { Incidencias, Participacion } from "./jornada";
@@ -93,59 +94,75 @@ export function DiaD({ esSuperadmin }: { esSuperadmin: boolean }) {
 
   return (
     <div className="mx-auto max-w-6xl space-y-3 p-3 sm:p-4">
-      {/* Cabecera de la jornada */}
-      <div className="panel-vidrio flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-2xl px-4 py-3 text-xs">
-        <span className="flex items-center gap-1.5 text-sm font-extrabold">
-          <Activity size={15} className={config.activa ? "animate-pulse text-rosa" : "text-texto-3"} />
-          {config.eleccion}
-        </span>
-        <span
-          className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${
-            config.activa ? "border-completo/50 bg-completo/10 text-completo" : "border-borde-2 text-texto-3"
-          }`}
-        >
-          {config.activa ? "jornada abierta" : "jornada cerrada"}
-        </span>
-        {config.fecha && (
-          <span className="text-texto-2">
-            {new Date(`${config.fecha}T12:00:00`).toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" })}
-            {" · "}
-            {config.hora_apertura}–{config.hora_cierre}
+      {/* Cabecera de la jornada: identidad arriba, cifras abajo */}
+      <div className="panel-vidrio rounded-2xl px-4 py-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+          <span className="flex items-center gap-1.5 text-sm font-extrabold">
+            <Activity size={15} className={config.activa ? "animate-pulse text-rosa" : "text-texto-3"} />
+            {config.eleccion}
           </span>
-        )}
-        <span className="text-texto-3">
-          <b className="num text-texto-2">{numero(resumen.conFiscal)}</b>/{numero(mesas.length)} mesas con fiscal
-        </span>
-        {resumen.ausentes > 0 && (
-          <span className="font-bold text-sin">
-            <b className="num">{resumen.ausentes}</b> fiscales ausentes
+          <span
+            className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+              config.activa ? "border-completo/50 bg-completo/10 text-completo" : "border-borde-2 text-texto-3"
+            }`}
+          >
+            <span
+              className={`size-1.5 rounded-full ${config.activa ? "animate-pulse bg-completo" : "bg-texto-3"}`}
+              aria-hidden
+            />
+            {config.activa ? "jornada abierta" : "jornada cerrada"}
           </span>
-        )}
-        {resumen.incidencias > 0 && (
-          <span className="font-bold text-encurso">
-            <b className="num">{resumen.incidencias}</b> incidencias abiertas
-          </span>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          {tel.tel && (
-            <a
-              href={tel.tel}
-              title={`Llamar al comando · ${tel.crudo}`}
-              className="flex items-center gap-1.5 rounded-lg border border-rosa/40 px-2.5 py-1 font-bold text-rosa transition hover:border-rosa"
-            >
-              <Phone size={12} /> Comando
-            </a>
+          {config.fecha && (
+            <span className="text-texto-2">
+              {new Date(`${config.fecha}T12:00:00`).toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" })}
+              {" · "}
+              {config.hora_apertura}–{config.hora_cierre}
+            </span>
           )}
-          {esSuperadmin && (
-            <button
-              onClick={() => void abrirCerrar(!config.activa)}
-              title={config.activa ? "Cerrar la jornada (deja de refrescarse solo; los datos quedan)" : "Abrir la jornada"}
-              className="flex items-center gap-1.5 rounded-lg border border-borde-2 px-2.5 py-1 font-bold text-texto-2 transition hover:border-rosa/50 hover:text-rosa"
-            >
-              {config.activa ? <Lock size={12} /> : <Unlock size={12} />}
-              {config.activa ? "Cerrar" : "Abrir"}
-            </button>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            {tel.tel && (
+              <a
+                href={tel.tel}
+                title={`Llamar al comando · ${tel.crudo}`}
+                className="flex items-center gap-1.5 rounded-lg border border-rosa/40 px-2.5 py-1 font-bold text-rosa transition hover:border-rosa hover:bg-rosa/10"
+              >
+                <Phone size={12} /> Comando
+              </a>
+            )}
+            {esSuperadmin && (
+              <button
+                onClick={() => void abrirCerrar(!config.activa)}
+                title={config.activa ? "Cerrar la jornada (deja de refrescarse solo; los datos quedan)" : "Abrir la jornada"}
+                className="flex items-center gap-1.5 rounded-lg border border-borde-2 px-2.5 py-1 font-bold text-texto-2 transition hover:border-rosa/50 hover:text-rosa"
+              >
+                {config.activa ? <Lock size={12} /> : <Unlock size={12} />}
+                {config.activa ? "Cerrar" : "Abrir"}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-y-3 border-t border-borde pt-3">
+          <Cifra
+            valor={numero(resumen.conFiscal)}
+            de={numero(mesas.length)}
+            etiqueta="mesas con fiscal"
+            tono={resumen.conFiscal === 0 ? "neutro" : "ok"}
+          />
+          <Cifra
+            valor={numero(Math.max(0, mesas.length - resumen.conFiscal))}
+            etiqueta="mesas sin cubrir"
+            tono={mesas.length - resumen.conFiscal > 0 ? "alerta" : "ok"}
+          />
+          <CifraSiHay
+            valor={resumen.ausentes}
+            etiqueta={resumen.ausentes === 1 ? "fiscal ausente" : "fiscales ausentes"}
+          />
+          <CifraSiHay
+            valor={resumen.incidencias}
+            etiqueta={resumen.incidencias === 1 ? "incidencia abierta" : "incidencias abiertas"}
+            tono="aviso"
+          />
         </div>
       </div>
 
@@ -175,7 +192,12 @@ export function DiaD({ esSuperadmin }: { esSuperadmin: boolean }) {
         <Fiscales supabase={supabase} config={config} personas={personas} onCambio={cargarResumen} />
       )}
       {seccion === "prioridad" && (
-        <PrioridadMesas supabase={supabase} fiscalesAsignados={resumen.conFiscal} totalMesas={mesas.length} />
+        <PrioridadMesas
+          supabase={supabase}
+          fiscalesAsignados={resumen.conFiscal}
+          totalMesas={mesas.length}
+          totalElectores={mesas.reduce((a, m) => a + m.electores, 0)}
+        />
       )}
       {seccion === "participacion" && <Participacion supabase={supabase} config={config} mesas={mesas} />}
       {seccion === "incidencias" && <Incidencias supabase={supabase} mesas={mesas} />}

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { repartirDHondt } from "@/lib/dhondt";
 import type { ConfigDiaD, Mesa } from "@/lib/diad";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { Cifra, Cifras } from "@/components/ui/cifras";
 
 const numero = (n: number) => n.toLocaleString("es-AR");
 
@@ -196,36 +197,40 @@ export function Escrutinio({
 
   return (
     <div className="space-y-3">
-      <div className="panel-vidrio flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl px-4 py-3 text-xs">
-        <span className="flex items-center gap-1.5 font-extrabold">
-          <Activity size={14} className={config.activa ? "animate-pulse text-rosa" : "text-texto-3"} /> Escrutinio
-        </span>
-        <span>
-          <b className="num">{numero(cargas.length)}</b>
-          <span className="text-texto-3">/{numero(config.mesas_esperadas)} mesas · </span>
-          <b className="num text-rosa">{pctEscrutado}%</b>
-          <span className="text-texto-3"> escrutado</span>
-        </span>
-        <span>
-          <b className="num">{numero(totales.votantes)}</b> <span className="text-texto-3">votantes</span>
-        </span>
-        <span className="text-texto-3">
-          blancos <b className="num text-texto-2">{numero(totales.blancosTot)}</b> · nulos{" "}
-          <b className="num text-texto-2">{numero(totales.nulosTot)}</b>
-        </span>
-        {config.meta_votos > 0 && (
-          <span title="Meta de votos propia fijada en Configuración">
-            <span className="text-texto-3">meta </span>
-            <b className="num text-amarillo">{numero(config.meta_votos)}</b>
+      <Cifras
+        acciones={
+          <span className="flex items-center gap-2 text-[10px] text-texto-3">
+            {actualizado ? `actualizado ${actualizado.toLocaleTimeString("es-AR")}` : ""}
+            <button onClick={() => void recargar()} title="Actualizar ahora" className="transition hover:text-texto">
+              <RefreshCw size={12} />
+            </button>
           </span>
+        }
+      >
+        <Cifra
+          valor={pctEscrutado}
+          unidad="%"
+          etiqueta="escrutado"
+          tono="marca"
+          nota={
+            <span className="flex items-center gap-1">
+              <Activity size={10} className={config.activa ? "animate-pulse text-rosa" : "text-texto-3"} />
+            </span>
+          }
+        />
+        <Cifra valor={numero(cargas.length)} de={numero(config.mesas_esperadas)} etiqueta="mesas cargadas" />
+        <Cifra valor={numero(totales.votantes)} etiqueta="votantes" />
+        <Cifra valor={numero(totales.blancosTot)} etiqueta="blancos" />
+        <Cifra valor={numero(totales.nulosTot)} etiqueta="nulos" />
+        {config.meta_votos > 0 && (
+          <Cifra
+            valor={numero(config.meta_votos)}
+            etiqueta="meta propia"
+            tono="aviso"
+            titulo="Meta de votos propia fijada en Configuración"
+          />
         )}
-        <span className="ml-auto flex items-center gap-2 text-[10px] text-texto-3">
-          {actualizado ? `actualizado ${actualizado.toLocaleTimeString("es-AR")}` : ""}
-          <button onClick={() => void recargar()} title="Actualizar ahora" className="transition hover:text-texto">
-            <RefreshCw size={12} />
-          </button>
-        </span>
-      </div>
+      </Cifras>
 
       <div className="grid min-w-0 gap-3 lg:grid-cols-[380px_1fr]">
         {/* Carga del telegrama */}

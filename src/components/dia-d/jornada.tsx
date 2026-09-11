@@ -16,6 +16,8 @@ import {
   type ParticipacionCircuito,
 } from "@/lib/diad";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { Cifra, Cifras } from "@/components/ui/cifras";
+import { Vacio } from "@/components/ui/vacio";
 
 const numero = (n: number) => n.toLocaleString("es-AR");
 
@@ -170,26 +172,32 @@ export function Participacion({
       </div>
 
       {/* Resumen del corte */}
-      <div className="panel-vidrio flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl px-4 py-3 text-xs">
-        <span className="flex items-center gap-1.5 font-extrabold">
-          <TrendingUp size={13} className="text-rosa" /> {corte}
-        </span>
-        <span>
-          <b className="num">{numero(totales.reportadas)}</b>
-          <span className="text-texto-3">/{numero(totales.totales)} mesas reportaron</span>
-        </span>
-        {totales.pct != null ? (
-          <span>
-            <b className="num text-rosa">{totales.pct.toFixed(1)}%</b>
-            <span className="text-texto-3">
-              {" "}
-              de participación · {numero(totales.votaron)} de {numero(totales.electores)} electores reportados
-            </span>
+      <Cifras
+        acciones={
+          <span className="flex items-center gap-1.5 rounded-lg border border-rosa/40 px-2.5 py-1 text-xs font-bold text-rosa">
+            <TrendingUp size={13} /> {corte}
           </span>
+        }
+      >
+        <Cifra
+          valor={numero(totales.reportadas)}
+          de={numero(totales.totales)}
+          etiqueta="mesas reportaron"
+          tono={totales.reportadas > 0 ? "ok" : "neutro"}
+        />
+        {totales.pct != null ? (
+          <>
+            <Cifra valor={totales.pct.toFixed(1)} unidad="%" etiqueta="participación" tono="marca" />
+            <Cifra
+              valor={numero(totales.votaron)}
+              de={numero(totales.electores)}
+              etiqueta="electores reportados"
+            />
+          </>
         ) : (
-          <span className="text-texto-3">todavía nadie reportó este corte</span>
+          <Cifra valor="—" etiqueta="nadie reportó este corte todavía" />
         )}
-      </div>
+      </Cifras>
 
       {conDato.length > 0 && (
         <div className="panel-vidrio rounded-2xl p-4">
@@ -378,7 +386,7 @@ export function Incidencias({ supabase, mesas }: { supabase: SupabaseClient; mes
       <div className="panel-vidrio rounded-2xl p-4">
         <div className="flex items-center justify-between">
           <h3 className="text-[11px] font-bold tracking-wide text-texto-2 uppercase">
-            {abiertas.length} abiertas
+            {abiertas.length} {abiertas.length === 1 ? "abierta" : "abiertas"}
             {abiertas.some((i) => i.gravedad === "alta") && (
               <span className="ml-2 rounded-full border border-sin/50 bg-sin/10 px-2 py-0.5 text-[9px] text-sin">
                 {abiertas.filter((i) => i.gravedad === "alta").length} graves
@@ -397,7 +405,13 @@ export function Incidencias({ supabase, mesas }: { supabase: SupabaseClient; mes
 
         {lista === null && <p className="mt-2 text-xs text-texto-2">Cargando…</p>}
         {lista !== null && abiertas.length === 0 && !verResueltas && (
-          <p className="mt-2 text-xs text-texto-2">Ninguna incidencia abierta. 👌</p>
+          <div className="mt-3">
+            <Vacio icono={Check} titulo="Ninguna incidencia abierta" variante="filtro">
+              {resueltas.length > 0
+                ? `Se resolvieron ${resueltas.length}. La jornada viene limpia.`
+                : "Cuando el comando reporte un problema de mesa va a aparecer acá, con su gravedad."}
+            </Vacio>
+          </div>
         )}
 
         <div className="mt-2 space-y-1.5">

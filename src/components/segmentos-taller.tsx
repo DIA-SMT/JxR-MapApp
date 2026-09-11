@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Download, Map as MapIcon, Save, SlidersHorizontal, Trash2, Users } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Filter, Map as MapIcon, Save, SlidersHorizontal, Trash2, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CIRCUITOS } from "@/lib/espacios";
@@ -14,6 +14,8 @@ import {
   type Segmento,
 } from "@/lib/padron";
 import { crearClienteNavegador } from "@/lib/supabase/cliente";
+import { Barra, ListaEsqueleto } from "@/components/ui/esqueleto";
+import { Vacio } from "@/components/ui/vacio";
 
 const numero = (n: number) => n.toLocaleString("es-AR");
 
@@ -262,13 +264,23 @@ export function SegmentosTaller() {
                 <div className="flex items-center gap-1.5 text-[10px] font-bold tracking-wide text-texto-2 uppercase">
                   <Users size={11} /> Electores en el segmento
                 </div>
-                <div className={`num text-4xl font-extrabold text-rosa transition ${calculando ? "opacity-40" : ""}`}>
-                  {resultado ? numero(resultado.total) : "…"}
-                </div>
-                {resultado && (
+                {resultado ? (
+                  <div className={`num text-4xl font-extrabold text-rosa transition ${calculando ? "opacity-40" : ""}`}>
+                    {numero(resultado.total)}
+                  </div>
+                ) : (
+                  <div className="py-1.5">
+                    <Barra w="w-40" h="h-8" />
+                  </div>
+                )}
+                {resultado ? (
                   <div className="mt-0.5 text-[11px] text-texto-2">
                     {numero(resultado.mujeres)} mujeres · {numero(resultado.varones)} varones ·{" "}
                     {numero(resultado.con_mesa)} con mesa
+                  </div>
+                ) : (
+                  <div className="mt-1.5">
+                    <Barra w="w-56" h="h-2.5" />
                   </div>
                 )}
               </div>
@@ -310,6 +322,23 @@ export function SegmentosTaller() {
               </div>
             )}
           </div>
+
+          {/* Mientras la base cuenta, el panel guarda su lugar: si no, el layout
+              se arma de golpe y la pantalla parece vacía. */}
+          {!resultado && (
+            <div className="panel-vidrio rounded-2xl p-4">
+              <div className="mb-3 text-[10px] font-bold tracking-wide text-texto-2 uppercase">
+                Dónde está el segmento (por circuito)
+              </div>
+              <ListaEsqueleto filas={8} />
+            </div>
+          )}
+
+          {resultado && resultado.por_circuito.length === 0 && (
+            <Vacio icono={Filter} titulo="Ningún elector queda en el segmento" variante="filtro">
+              La combinación de filtros no deja a nadie. Probá ampliando la franja etaria o quitando circuitos.
+            </Vacio>
+          )}
 
           {resultado && resultado.por_circuito.length > 0 && (
             <div className="panel-vidrio rounded-2xl p-4">

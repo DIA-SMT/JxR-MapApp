@@ -18,6 +18,8 @@ import {
 } from "@/lib/diad";
 import type { Persona } from "@/lib/tipos";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { Cifra, CifraSiHay, Cifras } from "@/components/ui/cifras";
+import { Vacio } from "@/components/ui/vacio";
 
 const numero = (n: number) => n.toLocaleString("es-AR");
 const sinAcentos = (t: string) =>
@@ -145,31 +147,29 @@ export function Fiscales({
 
   return (
     <div className="space-y-3">
-      {/* KPIs de cobertura */}
-      <div className="panel-vidrio flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl px-4 py-3 text-xs">
-        <span>
-          <b className="num text-texto">{numero(kpis.cubiertas)}</b>
-          <span className="text-texto-3">/{numero(kpis.total)} mesas con fiscal</span>
-        </span>
-        <span className={kpis.sin > 0 ? "font-bold text-sin" : "text-completo"}>
-          <b className="num">{numero(kpis.sin)}</b> sin cubrir
-        </span>
-        <span className="h-4 w-px bg-borde-2" />
-        <span className="text-texto-2">
-          confirmados <b className="num text-celeste">{kpis.confirmados}</b> · presentes{" "}
-          <b className="num text-completo">{kpis.presentes}</b> · ausentes{" "}
-          <b className="num text-sin">{kpis.ausentes}</b>
-        </span>
-        {config.telefono_comando && (
-          <a
-            href={contacto(config.telefono_comando).tel ?? "#"}
-            className="ml-auto flex items-center gap-1.5 rounded-lg border border-rosa/40 px-2.5 py-1 font-bold text-rosa transition hover:border-rosa"
-            title="Llamar al comando central"
-          >
-            <Phone size={12} /> Comando
-          </a>
-        )}
-      </div>
+      {/* Cobertura: la barra dice de un vistazo cuánto del padrón está vigilado */}
+      <Cifras>
+        <Cifra
+          valor={numero(kpis.cubiertas)}
+          de={numero(kpis.total)}
+          etiqueta="mesas con fiscal"
+          nota={`${kpis.total > 0 ? Math.round((100 * kpis.cubiertas) / kpis.total) : 0}%`}
+          tono={kpis.cubiertas === 0 ? "neutro" : "ok"}
+        />
+        <Cifra
+          valor={numero(kpis.sin)}
+          etiqueta="sin cubrir"
+          tono={kpis.sin > 0 ? "alerta" : "ok"}
+        />
+        <Cifra valor={numero(kpis.confirmados)} etiqueta="confirmados" titulo="Avisaron que van" />
+        <Cifra
+          valor={numero(kpis.presentes)}
+          etiqueta="presentes"
+          tono={kpis.presentes > 0 ? "ok" : "neutro"}
+          titulo="Ya están en la escuela"
+        />
+        <CifraSiHay valor={kpis.ausentes} etiqueta={kpis.ausentes === 1 ? "ausente" : "ausentes"} />
+      </Cifras>
 
       {/* Búsqueda y filtros */}
       <div className="panel-vidrio flex flex-wrap items-center gap-2 rounded-2xl p-2">
@@ -208,7 +208,11 @@ export function Fiscales({
       </div>
 
       {porEscuela.length === 0 && (
-        <p className="px-1 text-xs text-texto-2">Ninguna mesa coincide con la búsqueda o el filtro.</p>
+        <Vacio icono={Search} titulo="Ninguna mesa coincide" variante="filtro">
+          {filtro === "cubiertas" && kpis.cubiertas === 0
+            ? "Todavía no asignaste ningún fiscal. Pasá a «Todas» y abrí una escuela para empezar."
+            : "Probá con otro texto o cambiá el filtro. Se busca por mesa, escuela, circuito, nombre y teléfono."}
+        </Vacio>
       )}
 
       {/* Escuelas: se abren para ver y asignar mesa por mesa */}

@@ -394,7 +394,9 @@ export function Estrategia2023() {
       {tab === "frontera" && (
         <div className={`panel-vidrio overflow-x-auto rounded-2xl transition ${recalculando ? "opacity-50" : ""}`}>
           <table className="w-full min-w-[640px] text-left text-xs">
-            <thead>
+            {/* Encabezado fijo: la tabla llega a 200+ escuelas y sin esto se
+                pierde qué columna es cada número al scrollear. */}
+            <thead className="sticky top-0 z-10 bg-panel/95 backdrop-blur">
               <tr className="border-b border-borde text-[10px] tracking-wide text-texto-3 uppercase">
                 <th className="px-3 py-2">Tier</th>
                 <th className="px-3 py-2">Trabajar</th>
@@ -415,7 +417,10 @@ export function Estrategia2023() {
                 <tr><td colSpan={9} className="px-3 py-4 text-texto-3">Sin datos: revisá la selección de listas.</td></tr>
               )}
               {frontera.map((f) => (
-                <tr key={f.escuela} className={`border-b border-borde/50 transition ${f.en_frontera ? "bg-rosa/5" : ""}`}>
+                <tr
+                  key={f.escuela}
+                  className={`border-b border-borde/50 transition hover:bg-panel-3/50 ${f.en_frontera ? "bg-rosa/5" : ""}`}
+                >
                   <td className="px-3 py-2">
                     <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${TIER_ESTILO[f.tier]}`}>{f.tier}</span>
                   </td>

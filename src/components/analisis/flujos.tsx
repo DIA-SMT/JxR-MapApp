@@ -9,6 +9,7 @@ import {
 } from "@/lib/analisis-politico";
 import { leerTransferencia, type ResultadoTransferencia } from "@/lib/transferencia";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { Cifra, Cifras } from "@/components/ui/cifras";
 
 const numero = (n: number) => n.toLocaleString("es-AR");
 
@@ -261,18 +262,12 @@ export function VotoJoven({ supabase }: { supabase: SupabaseClient }) {
 
       {filas && (
         <>
-          <div className="panel-vidrio flex flex-wrap items-center gap-x-5 gap-y-1 rounded-2xl px-4 py-3 text-xs">
-            <span>
-              <b className="num text-lg text-rosa">{numero(tot.jovenes)}</b>
-              <span className="text-texto-3"> electores de 16 a {edadMax}</span>
-            </span>
-            <span className="text-texto-2">
-              <b className="num">{tot.pct.toFixed(1)}%</b> del padrón
-            </span>
-            <span className="text-texto-3">
-              {numero(tot.mujeres)} mujeres · {numero(tot.varones)} varones
-            </span>
-          </div>
+          <Cifras>
+            <Cifra valor={numero(tot.jovenes)} etiqueta={`electores de 16 a ${edadMax}`} tono="marca" />
+            <Cifra valor={tot.pct.toFixed(1)} unidad="%" etiqueta="del padrón" />
+            <Cifra valor={numero(tot.mujeres)} etiqueta="mujeres" />
+            <Cifra valor={numero(tot.varones)} etiqueta="varones" />
+          </Cifras>
 
           <div className="panel-vidrio rounded-2xl p-4">
             <h3 className="text-[11px] font-bold tracking-wide text-texto-2 uppercase">

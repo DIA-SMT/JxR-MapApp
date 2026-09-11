@@ -20,6 +20,8 @@ import { obtenerPadronPorCircuito } from "@/lib/padron";
 import { CODIGOS } from "@/lib/espacios";
 import { descargarCSV } from "@/lib/csv";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { Cifra, Cifras } from "@/components/ui/cifras";
+import { Vacio } from "@/components/ui/vacio";
 
 const numero = (n: number) => n.toLocaleString("es-AR");
 
@@ -181,16 +183,25 @@ export function Contactos({ supabase }: { supabase: SupabaseClient }) {
       </div>
 
       {totales.contactados > 0 && (
-        <div className="panel-vidrio flex flex-wrap items-center gap-x-5 gap-y-1 rounded-2xl px-4 py-3 text-xs">
-          <span><b className="num text-lg">{numero(totales.contactados)}</b> <span className="text-texto-3">contactos</span></span>
+        <Cifras>
+          <Cifra valor={numero(totales.contactados)} etiqueta="puertas contactadas" tono="marca" />
           {totales.pctFav != null && (
-            <span><b className="num text-completo">{totales.pctFav.toFixed(1)}%</b> <span className="text-texto-3">favorable entre quienes respondieron</span></span>
+            <Cifra
+              valor={totales.pctFav.toFixed(1)}
+              unidad="%"
+              etiqueta="favorable"
+              tono="ok"
+              titulo="Sobre quienes respondieron, no sobre el total de puertas"
+            />
           )}
-          <span className="text-texto-2">
-            {numero(totales.favorables)} favorables · {numero(totales.indecisos)} indecisos · {numero(totales.contrarios)} contrarios
-          </span>
-          <span className="text-texto-3">{totales.territorios} territorios trabajados</span>
-        </div>
+          <Cifra valor={numero(totales.favorables)} etiqueta="favorables" tono="ok" />
+          <Cifra valor={numero(totales.indecisos)} etiqueta="indecisos" tono="aviso" />
+          <Cifra valor={numero(totales.contrarios)} etiqueta="contrarios" tono="alerta" />
+          <Cifra
+            valor={numero(totales.territorios)}
+            etiqueta={totales.territorios === 1 ? "territorio trabajado" : "territorios trabajados"}
+          />
+        </Cifras>
       )}
 
       {resumen && resumen.length > 0 && (
@@ -429,22 +440,26 @@ export function Muestra({ supabase }: { supabase: SupabaseClient }) {
 
       {diseno && (
         <>
-          <div className="panel-vidrio flex flex-wrap items-center gap-x-5 gap-y-1 rounded-2xl px-4 py-3 text-xs">
-            <span><b className="num text-lg text-rosa">{numero(diseno.n)}</b> <span className="text-texto-3">entrevistas</span></span>
-            <span><b className="num">±{diseno.margen}</b> <span className="text-texto-3">puntos al {diseno.confianza}%</span></span>
-            <span className="text-texto-3">sobre {numero(diseno.poblacion)} electores en {diseno.estratos.length} circuitos</span>
-            <div className="ml-auto flex items-center gap-1.5">
-              <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del diseño"
-                className="w-40 rounded-lg border border-borde-2 bg-panel px-2 py-1.5 text-[11px] outline-none placeholder:text-texto-3 focus:border-rosa/50" />
-              <button onClick={() => void guardar()} title="Guardar este diseño"
-                className="rounded-lg bg-rosa p-2 text-white transition hover:brightness-110">
-                <Save size={12} />
-              </button>
-              <button onClick={exportar} className="rounded-lg border border-borde-2 px-2.5 py-1.5 text-[11px] font-bold text-texto-2 transition hover:border-rosa/50 hover:text-rosa">
-                CSV
-              </button>
-            </div>
-          </div>
+          <Cifras
+            acciones={
+              <>
+                <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del diseño"
+                  className="w-40 rounded-lg border border-borde-2 bg-panel px-2 py-1.5 text-[11px] outline-none placeholder:text-texto-3 focus:border-rosa/50" />
+                <button onClick={() => void guardar()} title="Guardar este diseño"
+                  className="rounded-lg bg-rosa p-2 text-white transition hover:brightness-110">
+                  <Save size={12} />
+                </button>
+                <button onClick={exportar} className="rounded-lg border border-borde-2 px-2.5 py-1.5 text-[11px] font-bold text-texto-2 transition hover:border-rosa/50 hover:text-rosa">
+                  CSV
+                </button>
+              </>
+            }
+          >
+            <Cifra valor={numero(diseno.n)} etiqueta="entrevistas" tono="marca" />
+            <Cifra valor={`±${diseno.margen}`} etiqueta={`puntos al ${diseno.confianza}%`} />
+            <Cifra valor={numero(diseno.poblacion)} etiqueta="electores representados" />
+            <Cifra valor={numero(diseno.estratos.length)} etiqueta="circuitos" />
+          </Cifras>
           {aviso && <p className="px-1 text-[11px] font-bold text-completo">{aviso}</p>}
 
           {diseno.avisos.length > 0 && (

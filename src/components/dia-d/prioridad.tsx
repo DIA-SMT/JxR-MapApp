@@ -6,6 +6,9 @@ import { obtenerPrioridadMesas, type MesaPrioritaria } from "@/lib/analisis-poli
 import { resolverSeleccion } from "@/lib/estrategia";
 import { descargarCSV } from "@/lib/csv";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { Cifra, Cifras } from "@/components/ui/cifras";
+import { Vacio } from "@/components/ui/vacio";
+import { TablaEsqueleto } from "@/components/ui/esqueleto";
 
 const numero = (n: number) => n.toLocaleString("es-AR");
 const TOPE = 400; // el ranking se pide acotado: más abajo la prioridad ya no discrimina
@@ -27,10 +30,12 @@ export function PrioridadMesas({
   supabase,
   fiscalesAsignados,
   totalMesas,
+  totalElectores,
 }: {
   supabase: SupabaseClient;
   fiscalesAsignados: number;
   totalMesas: number;
+  totalElectores: number;
 }) {
   const [filas, setFilas] = useState<MesaPrioritaria[] | null>(null);
   const [cuantos, setCuantos] = useState(150);
@@ -115,7 +120,20 @@ export function PrioridadMesas({
   };
 
   if (error) return <p className="p-4 text-xs text-peligro">{error}</p>;
-  if (!filas) return <p className="p-4 text-xs text-texto-2">Calculando la prioridad de las mesas…</p>;
+  if (!filas)
+    return (
+      <div className="space-y-3">
+        <div className="panel-vidrio rounded-2xl p-4">
+          <h3 className="flex items-center gap-2 text-[11px] font-bold tracking-wide text-texto-2 uppercase">
+            <ListOrdered size={13} className="text-rosa" /> Qué cubrir primero
+          </h3>
+          <p className="mt-1 text-[11px] text-texto-2">Calculando la prioridad de las mesas…</p>
+        </div>
+        <div className="panel-vidrio rounded-2xl p-4">
+          <TablaEsqueleto filas={10} columnas={6} />
+        </div>
+      </div>
+    );
 
   return (
     <div className="space-y-3">
@@ -166,24 +184,32 @@ export function PrioridadMesas({
         </div>
       </div>
 
-      <div className="panel-vidrio flex flex-wrap items-center gap-x-5 gap-y-1 rounded-2xl px-4 py-3 text-xs">
-        <span>
-          Cubrís <b className="num text-rosa">{numero(resumen.mesas)}</b> mesas en{" "}
-          <b className="num">{numero(resumen.escuelas)}</b> escuelas y vigilás{" "}
-          <b className="num">{numero(resumen.electores)}</b> <span className="text-texto-3">electores</span>
-        </span>
-        <span className="text-texto-3">
-          competitividad media <b className="num text-texto-2">{(100 * resumen.competitividad).toFixed(0)}%</b>
-        </span>
-        <span className={resumen.sinFiscalTotal > 0 ? "text-sin" : "text-completo"}>
-          <b className="num">{numero(resumen.sinFiscalTotal)}</b> mesas sin fiscal en toda la ciudad
-        </span>
-      </div>
+      <Cifras>
+        <Cifra valor={numero(resumen.mesas)} etiqueta="mesas que cubrís" tono="marca" />
+        <Cifra valor={numero(resumen.escuelas)} etiqueta="escuelas" />
+        <Cifra
+          valor={numero(resumen.electores)}
+          etiqueta="electores vigilados"
+          nota={totalElectores > 0 ? `${Math.round((100 * resumen.electores) / totalElectores)}% del padrón` : undefined}
+        />
+        <Cifra
+          valor={(100 * resumen.competitividad).toFixed(0)}
+          unidad="%"
+          etiqueta="competitividad media"
+          titulo="Promedio de lo peleado que quedaron en 2025 los circuitos de estas mesas"
+        />
+        <Cifra
+          valor={numero(resumen.sinFiscalTotal)}
+          etiqueta="sin fiscal en la ciudad"
+          tono={resumen.sinFiscalTotal > 0 ? "alerta" : "ok"}
+        />
+      </Cifras>
 
       {objetivo.length === 0 && (
-        <p className="px-1 text-xs text-completo">
-          Las {numero(TOPE)} mesas prioritarias ya tienen fiscal. Cubrí el resto por orden de volumen desde Fiscales.
-        </p>
+        <Vacio icono={ListOrdered} titulo="Las mesas prioritarias ya están cubiertas" variante="filtro">
+          Las {numero(TOPE)} de mayor prioridad tienen fiscal asignado. El resto conviene cubrirlo por orden de
+          volumen desde Fiscales.
+        </Vacio>
       )}
 
       {objetivo.length > 0 && (
@@ -191,7 +217,7 @@ export function PrioridadMesas({
           <div className="overflow-auto">
             {vista === "escuela" ? (
               <table className="w-full min-w-[620px] text-[11px]">
-                <thead className="text-left text-texto-3">
+                <thead className="sticky top-0 z-10 bg-panel/95 text-left text-texto-3 backdrop-blur">
                   <tr>
                     <th className="num py-1 pr-2 text-right font-semibold">#</th>
                     <th className="py-1 pr-2 font-semibold">Escuela</th>
@@ -209,7 +235,7 @@ export function PrioridadMesas({
                 </thead>
                 <tbody>
                   {porEscuela.map((e, i) => (
-                    <tr key={e.escuela} className="border-t border-borde/60">
+                    <tr key={e.escuela} className="border-t border-borde/60 transition hover:bg-panel-3/50">
                       <td className="num py-1 pr-2 text-right text-texto-3">{i + 1}</td>
                       <td className="max-w-72 truncate py-1 pr-2 font-semibold" title={e.escuela}>
                         {e.escuela}
@@ -226,7 +252,7 @@ export function PrioridadMesas({
               </table>
             ) : (
               <table className="w-full min-w-[620px] text-[11px]">
-                <thead className="text-left text-texto-3">
+                <thead className="sticky top-0 z-10 bg-panel/95 text-left text-texto-3 backdrop-blur">
                   <tr>
                     <th className="num py-1 pr-2 text-right font-semibold">#</th>
                     <th className="num py-1 pr-2 text-right font-semibold">Mesa</th>
@@ -239,7 +265,7 @@ export function PrioridadMesas({
                 </thead>
                 <tbody>
                   {objetivo.map((m, i) => (
-                    <tr key={m.mesa} className="border-t border-borde/60">
+                    <tr key={m.mesa} className="border-t border-borde/60 transition hover:bg-panel-3/50">
                       <td className="num py-1 pr-2 text-right text-texto-3">{i + 1}</td>
                       <td className="num py-1 pr-2 text-right font-bold">{m.mesa}</td>
                       <td className="max-w-64 truncate py-1 pr-2" title={m.escuela}>
