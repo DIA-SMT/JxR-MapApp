@@ -1,0 +1,193 @@
+/* Manual de uso JxR — hoja A4. Marca: rosa #E14F82 + marino #14213D. */
+@page { size: A4; margin: 0; }
+
+:root {
+  --rosa: #e14f82;
+  --rosa-suave: #fdeef4;
+  --marino: #14213d;
+  --tinta: #1b2233;
+  --tinta-2: #55617a;
+  --tinta-3: #8b95a9;
+  --linea: #dfe4ee;
+  --verde: #199e70;
+  --amarillo: #b58900;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: Poppins, "Segoe UI", system-ui, sans-serif;
+  color: var(--tinta);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.hoja {
+  position: relative;
+  width: 210mm;
+  height: 297mm;
+  padding: 11mm 15mm 14mm;
+  overflow: hidden;
+  page-break-after: always;
+  background: #fff;
+}
+.hoja:last-child { page-break-after: auto; }
+
+/* ── Encabezado y pie corridos ─────────────────────────────────────────── */
+.cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1.5px solid var(--linea);
+  padding-bottom: 3mm;
+  margin-bottom: 6mm;
+}
+.cabecera .marca { display: flex; align-items: center; gap: 2.5mm; }
+.cabecera svg { width: 7mm; height: 7mm; }
+.cabecera .nombre { line-height: 1.1; }
+.cabecera .nombre small {
+  display: block;
+  font-size: 5pt;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--tinta-3);
+  font-weight: 600;
+}
+.cabecera .nombre b { font-size: 9pt; font-weight: 800; letter-spacing: -0.01em; }
+.cabecera .seccion { font-size: 7.5pt; color: var(--tinta-2); font-weight: 600; }
+
+.pie {
+  position: absolute;
+  bottom: 8mm;
+  left: 16mm;
+  right: 16mm;
+  display: flex;
+  justify-content: space-between;
+  font-size: 6.5pt;
+  color: var(--tinta-3);
+  border-top: 1px solid var(--linea);
+  padding-top: 2mm;
+}
+.pie .num { font-weight: 700; color: var(--rosa); }
+
+/* ── Tipografía ────────────────────────────────────────────────────────── */
+h1 { font-size: 26pt; font-weight: 800; line-height: 1.05; margin: 0 0 3mm; letter-spacing: -0.02em; }
+h2 {
+  font-size: 12pt;
+  font-weight: 800;
+  margin: 0 0 2.5mm;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: baseline;
+  gap: 2.5mm;
+}
+h2 .paso {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 6.5mm;
+  height: 6.5mm;
+  padding: 0 1.5mm;
+  border-radius: 2mm;
+  background: var(--rosa);
+  color: #fff;
+  font-size: 8.5pt;
+  font-weight: 800;
+}
+h3 {
+  font-size: 8.6pt;
+  font-weight: 800;
+  margin: 3mm 0 1.2mm;
+  color: var(--marino);
+}
+p { font-size: 8pt; line-height: 1.42; margin: 0 0 2mm; color: var(--tinta); }
+p.chico { font-size: 7.2pt; color: var(--tinta-2); }
+b, strong { font-weight: 700; }
+.rosa { color: var(--rosa); }
+
+ul { margin: 0 0 2.5mm; padding-left: 4.5mm; }
+li { font-size: 8pt; line-height: 1.38; margin-bottom: 0.9mm; }
+li::marker { color: var(--rosa); }
+
+/* ── Bloques ───────────────────────────────────────────────────────────── */
+figure { margin: 0 0 2.5mm; }
+figure img {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--linea);
+  border-radius: 2mm;
+}
+figcaption {
+  font-size: 6.5pt;
+  color: var(--tinta-3);
+  margin-top: 1.2mm;
+  line-height: 1.35;
+}
+figcaption b { color: var(--tinta-2); }
+
+.fila { display: flex; gap: 4mm; }
+.fila > * { min-width: 0; flex: 1; }
+
+.nota {
+  border-left: 2.5px solid var(--rosa);
+  background: var(--rosa-suave);
+  padding: 2mm 2.5mm;
+  border-radius: 0 2mm 2mm 0;
+  margin: 0 0 3mm;
+}
+.nota p { margin: 0; font-size: 7.4pt; line-height: 1.4; }
+.nota .titulo {
+  font-size: 6.5pt;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--rosa);
+  margin-bottom: 1mm;
+}
+.nota.cuidado { border-color: var(--amarillo); background: #fdf6e3; }
+.nota.cuidado .titulo { color: var(--amarillo); }
+
+table { width: 100%; border-collapse: collapse; margin: 0 0 2.5mm; }
+th {
+  text-align: left;
+  font-size: 6.5pt;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--tinta-3);
+  border-bottom: 1.5px solid var(--linea);
+  padding: 0 2mm 1.2mm 0;
+  font-weight: 800;
+}
+td {
+  font-size: 7.6pt;
+  padding: 1.1mm 2mm 1.1mm 0;
+  border-bottom: 1px solid var(--linea);
+  vertical-align: top;
+  line-height: 1.4;
+}
+td:first-child { font-weight: 700; white-space: nowrap; }
+
+.pildora {
+  display: inline-block;
+  padding: 0.6mm 2mm;
+  border-radius: 3mm;
+  font-size: 6.8pt;
+  font-weight: 700;
+  border: 1px solid var(--rosa);
+  color: var(--rosa);
+  white-space: nowrap;
+}
+.pildora.gris { border-color: var(--linea); color: var(--tinta-2); }
+
+/* Imágenes verticales: tope de alto para que no desborden la hoja. */
+figure img.tope-120 { max-height: 120mm; object-fit: cover; object-position: top; }
+figure img.tope-95 { max-height: 95mm; object-fit: cover; object-position: top; }
+figure img.tope-80 { max-height: 80mm; object-fit: cover; object-position: top; }
+
+figure img.tope-88 { max-height: 88mm; object-fit: cover; object-position: top; }
+
+figure img.tope-88-abajo { max-height: 88mm; object-fit: cover; object-position: bottom; }
+figure img.tope-70 { max-height: 70mm; object-fit: cover; object-position: top; }
+figure img.tope-45 { max-height: 45mm; object-fit: cover; object-position: top; }

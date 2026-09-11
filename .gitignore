@@ -26,3 +26,7 @@ next-env.d.ts
 *.pdf
 *.csv
 
+
+# Manual de uso: las capturas crudas y las previas se regeneran con los scripts
+manual/capturas/
+manual/previa/

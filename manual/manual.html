@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<title>Manual de uso · JxR Comando Territorial</title>
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+
+<!-- ══════════════════════ 1 · PORTADA ══════════════════════ -->
+<section class="hoja">
+  <div style="display:flex;align-items:center;gap:5mm;margin-bottom:9mm">
+    <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="width:22mm;height:22mm">
+      <rect x="1" y="1" width="62" height="62" rx="16" fill="#E14F82"/>
+      <text x="11" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">J</text>
+      <text x="38" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">R</text>
+      <text x="24" y="41" font-family="Poppins,sans-serif" font-weight="800" font-size="21" fill="#14213D" transform="rotate(-8 32 32)">x</text>
+      <path d="M13 51 Q32 59 51 49" stroke="#14213D" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+    </svg>
+    <div>
+      <div style="font-size:7pt;letter-spacing:0.22em;text-transform:uppercase;color:#8b95a9;font-weight:600">Comando Territorial</div>
+      <div style="font-size:19pt;font-weight:800;letter-spacing:-0.02em;line-height:1.1">San Miguel de Tucumán</div>
+    </div>
+  </div>
+
+  <h1>Manual de uso</h1>
+  <p style="font-size:10.5pt;color:#55617a;line-height:1.45;margin-bottom:7mm">
+    Cómo usar cada pantalla: el mapa, la ficha de cada circuito, el plan territorial, Elena,
+    la estrategia de bancas y el búnker de la noche de la elección.
+  </p>
+
+  <h3 style="margin-top:0">Qué es</h3>
+  <p>
+    Una herramienta de comando territorial: cruza <b>el padrón</b>, <b>los resultados electorales mesa a mesa</b>,
+    <b>el perfil social del censo</b> y <b>el mapa de barrios</b> para responder tres preguntas — dónde estamos
+    parados, dónde conviene crecer y quién se ocupa de cada territorio. Todo el análisis es agregado por zona:
+    el sistema nunca dice ni sugiere cómo vota una persona.
+  </p>
+
+  <h3>Con qué datos trabaja</h3>
+  <table>
+    <tr><td>Padrón</td><td>459.156 electores de la Capital, con sexo, domicilio, circuito, escuela y mesa. Las edades son <b>estimadas por rango de DNI</b> (±3 años): el padrón no trae fecha de nacimiento.</td></tr>
+    <tr><td>Elección 2023</td><td>Escrutinio <b>definitivo</b> mesa a mesa, los cuatro cargos (Gobernador, Legislador, Intendente, Concejal). Es la única con cuatro cargos juntos, así que es donde se mide el corte de boleta.</td></tr>
+    <tr><td>Elección 2025</td><td>Diputados Nacionales, escrutinio <b>provisorio</b>, 1.350 mesas. En Capital: LLA 43,7% contra Frente Tucumán Primero 40,1%.</td></tr>
+    <tr><td>Censo 2022</td><td>671 radios censales del INDEC: pobreza, servicios, trabajo, educación y salud, agregados por circuito y por barrio.</td></tr>
+    <tr><td>Territorio</td><td>20 distritos, 47 circuitos electorales, 128 escuelas de votación y los 327 barrios del mapa oficial municipal.</td></tr>
+  </table>
+
+  <div class="nota cuidado">
+    <div class="titulo">Un límite que conviene tener presente</div>
+    <p>
+      Las mesas de la elección nacional 2025 <b>no llevan la misma numeración</b> que las del padrón provincial.
+      Por eso el 2025 se analiza por mesa y por circuito, sin bajar a escuela, y la comparación entre 2023 y 2025
+      se hace <b>por circuito</b>, donde los 47 códigos sí coinciden.
+    </p>
+  </div>
+
+  <h3>Contenido</h3>
+  <table style="margin-bottom:0">
+    <tr><td style="width:8mm">2</td><td>Acceso, encabezado y controles del mapa</td></tr>
+    <tr><td>3</td><td>Vistas del mapa: Operativo, Padrón y Escuelas</td></tr>
+    <tr><td>4</td><td>Vistas de análisis: Prioridad, Oportunidad y 2023↔2025</td></tr>
+    <tr><td>5</td><td>La ficha del circuito</td></tr>
+    <tr><td>6</td><td>El plan territorial y la ficha para imprimir</td></tr>
+    <tr><td>7</td><td>Elena: consultas, análisis pintado en el mapa e informes</td></tr>
+    <tr><td>8</td><td>Estrategia: voto disperso, universo y reparto de bancas</td></tr>
+    <tr><td>9</td><td>Búnker y uso en el teléfono</td></tr>
+  </table>
+
+  <div class="fila" style="margin-top:7mm">
+    <div style="flex:1">
+      <h3 style="margin-top:0">Dónde funciona</h3>
+      <p class="chico" style="margin-bottom:0">
+        En cualquier navegador, de la computadora o del teléfono. No hay nada que instalar y la sesión queda
+        abierta. Todas las pantallas están pensadas también para pantalla chica: el fiscal carga su mesa desde el
+        celular y el mismo tablero se ve en el búnker.
+      </p>
+    </div>
+    <div style="flex:1">
+      <h3 style="margin-top:0">Si algo no cuadra</h3>
+      <p class="chico" style="margin-bottom:0">
+        Cada número del sistema sale de una consulta a la base, no de una estimación. Si un dato no coincide con lo
+        que conocés del territorio, conviene avisarlo: puede ser un cruce de datos para revisar. Elena siempre deja
+        constancia de qué consultó para llegar a su respuesta.
+      </p>
+    </div>
+  </div>
+
+  <div class="pie">
+    <span>JxR · Comando Territorial · documento interno de campaña</span>
+    <span class="num">1</span>
+  </div>
+</section>
+
+<!-- ══════════════════════ 2 · ACCESO Y CONTROLES ══════════════════════ -->
+<section class="hoja">
+  <div class="cabecera">
+    <div class="marca">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="62" height="62" rx="16" fill="#E14F82"/><text x="11" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">J</text><text x="38" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">R</text><text x="24" y="41" font-family="Poppins,sans-serif" font-weight="800" font-size="21" fill="#14213D" transform="rotate(-8 32 32)">x</text><path d="M13 51 Q32 59 51 49" stroke="#14213D" stroke-width="4.5" stroke-linecap="round" fill="none"/></svg>
+      <div class="nombre"><small>Comando</small><b>Territorial</b></div>
+    </div>
+    <div class="seccion">Acceso y controles del mapa</div>
+  </div>
+
+  <h2><span class="paso">1</span> Entrar al sistema</h2>
+  <div class="fila">
+    <div style="flex:1.15">
+      <p>
+        El acceso es solo para administradores de la campaña: se entra con el correo y la contraseña que te
+        entregaron. <b>La primera vez el sistema obliga a cambiar la contraseña</b> antes de dejar usar cualquier
+        pantalla; es a propósito, porque la clave inicial la conoce quien te dio de alta.
+      </p>
+      <p class="chico" style="margin-bottom:0">
+        No hay recupero automático de contraseña: se la pedís a quien administra los usuarios, que puede
+        restablecerla desde la pantalla <b>Usuarios</b>.
+      </p>
+    </div>
+    <figure style="flex:1;margin-bottom:0">
+      <img src="img/01-acceso.jpg" alt="Pantalla de acceso al sistema">
+    </figure>
+  </div>
+
+  <h2 style="margin-top:5mm"><span class="paso">2</span> El encabezado</h2>
+  <p>
+    Arriba están las secciones del sistema. El botón de sol o luna cambia entre modo claro y oscuro —el mapa
+    cambia de estilo con él— y el último cierra la sesión.
+  </p>
+  <table>
+    <tr><td>Mapa</td><td>La pantalla principal: el territorio con todas sus vistas y la ficha de cada circuito.</td></tr>
+    <tr><td>Personas</td><td>La gente del operativo con DNI, teléfono, espacios asignados y avance de tareas.</td></tr>
+    <tr><td>Estrategia</td><td>Voto disperso, universos de listas, reparto de bancas e informes.</td></tr>
+    <tr><td>Segmentos</td><td>Cohortes del padrón guardables, por sexo, franja etaria y circuitos.</td></tr>
+    <tr><td>Búnker</td><td>El escrutinio propio en vivo de la noche de la elección.</td></tr>
+    <tr><td>Usuarios</td><td>Alta y baja de administradores. Solo la ve el superadmin.</td></tr>
+  </table>
+
+  <h2><span class="paso">3</span> La barra de controles del mapa</h2>
+  <figure>
+    <img src="img/03-controles.jpg" alt="Barra de controles del mapa con vistas, capas y buscador">
+    <figcaption>
+      <b>Primera fila:</b> las siete vistas, el selector Distritos/Circuitos, las capas y el buscador. &nbsp;
+      <b>Segunda fila:</b> los indicadores del operativo y, según la vista, sus filtros.
+    </figcaption>
+  </figure>
+
+  <table>
+    <tr><td>Vistas</td><td>Cambian <b>qué pinta el mapa</b>. Se explican en las dos páginas siguientes.</td></tr>
+    <tr><td>Distritos / Circuitos</td><td>Qué división se dibuja. El padrón y los resultados se organizan por <b>circuito</b>, así que en las vistas de datos «Distritos» queda deshabilitado.</td></tr>
+    <tr><td>Capas</td><td>Seis interruptores: <span class="pildora gris">3D</span> levanta cada espacio según la métrica de la vista · <span class="pildora gris">Cobertura</span> pinta el estado de asignación · <span class="pildora gris">Avenidas</span> y <span class="pildora gris">Calles</span> realzan el callejero · <span class="pildora gris">Barrios</span> dibuja los 327 barrios oficiales · <span class="pildora gris">Satélite</span> pone la foto real debajo.</td></tr>
+    <tr><td>Buscador</td><td>Tres formas de usarlo. Escribir un <b>circuito o distrito</b> («15B») y te lleva. Escribir el nombre de una <b>escuela</b> o de una <b>persona del padrón</b>. O pedirlo en lenguaje natural con el botón de la chispa: «mujeres de 16 a 25», «escuelas con más de 5.000 electores». El micrófono hace lo mismo dictando.</td></tr>
+    <tr><td>Indicadores</td><td>Electores del padrón; distritos y circuitos <b>con al menos una persona asignada</b> (sobre 20 y 47); personas con espacio; y tareas cumplidas sobre el total del checklist.</td></tr>
+  </table>
+
+  <div class="nota">
+    <div class="titulo">Cómo se navega</div>
+    <p>
+      Arrastrás para mover y la rueda del mouse acerca o aleja. <b>Un clic en cualquier circuito abre su ficha</b>
+      y lo encuadra; al pasar el cursor por encima aparece un resumen con todo lo que ya está cargado, sin importar
+      en qué vista estés. La leyenda vive abajo a la izquierda: se cierra con la X y vuelve con el botón «Leyenda».
+    </p>
+  </div>
+
+  <div class="pie"><span>JxR · Comando Territorial · documento interno de campaña</span><span class="num">2</span></div>
+</section>
+
+<!-- ══════════════════════ 3 · VISTAS BASE ══════════════════════ -->
+<section class="hoja">
+  <div class="cabecera">
+    <div class="marca">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="62" height="62" rx="16" fill="#E14F82"/><text x="11" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">J</text><text x="38" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">R</text><text x="24" y="41" font-family="Poppins,sans-serif" font-weight="800" font-size="21" fill="#14213D" transform="rotate(-8 32 32)">x</text><path d="M13 51 Q32 59 51 49" stroke="#14213D" stroke-width="4.5" stroke-linecap="round" fill="none"/></svg>
+      <div class="nombre"><small>Comando</small><b>Territorial</b></div>
+    </div>
+    <div class="seccion">Vistas del mapa · 1 de 2</div>
+  </div>
+
+  <h2>Operativo — quién tiene a cargo cada territorio</h2>
+  <div class="fila">
+    <figure style="flex:1.35">
+      <img src="img/02-mapa-operativo.jpg" alt="Vista Operativo del mapa">
+    </figure>
+    <div style="flex:1">
+      <p>
+        Pinta cada espacio según su estado de asignación: <span class="pildora" style="border-color:#ff3b30;color:#c0271e">sin asignar</span>
+        <span class="pildora" style="border-color:#b58900;color:#8a6800">en curso</span>
+        <span class="pildora" style="border-color:#199e70;color:#137a56">checklist completo</span>
+      </p>
+      <p>
+        Es la vista para saber <b>dónde falta estructura</b>. Con la capa 3D, la altura de cada espacio crece con
+        la gente asignada y las tareas pendientes: los bloques bajos y rojos son los agujeros del operativo.
+      </p>
+      <p class="chico" style="margin-bottom:0">
+        Es la única vista donde el selector <b>Distritos</b> está disponible, porque la cobertura se organiza en
+        las dos divisiones.
+      </p>
+    </div>
+  </div>
+
+  <h2 style="margin-top:4mm">Padrón — dónde está el electorado</h2>
+  <div class="fila">
+    <div style="flex:1">
+      <p>
+        Mapa de calor de electores por circuito, del más claro al más intenso. Con los filtros de la segunda fila
+        podés ver <b>solo mujeres o solo varones</b>, y una franja etaria: 16–25, 26–40, 41–60 o 60 y más.
+      </p>
+      <div class="nota" style="margin-bottom:0">
+        <div class="titulo">Las edades son estimadas</div>
+        <p>
+          El padrón no trae fecha de nacimiento, así que la franja se deduce del <b>rango del número de DNI</b>,
+          con un margen aproximado de ±3 años. Sirve para dimensionar cohortes, no para afirmar la edad de nadie.
+        </p>
+      </div>
+    </div>
+    <figure style="flex:1.35">
+      <img src="img/04-vista-padron.jpg" alt="Vista Padrón con la densidad de electores">
+    </figure>
+  </div>
+
+  <h2 style="margin-top:4mm">Escuelas — dónde se vota</h2>
+  <div class="fila">
+    <figure style="flex:1.35">
+      <img src="img/05-vista-escuelas.jpg" alt="Vista Escuelas con puntos y mapa de calor">
+    </figure>
+    <div style="flex:1">
+      <p>
+        Cada escuela es un punto cuyo tamaño crece con los electores que votan ahí, sobre un mapa de calor que
+        muestra la concentración. Las que tienen <b>anillo rosa</b> ya están dentro del universo de la estrategia.
+      </p>
+      <p>
+        Un clic en una escuela abre su ficha: padrón, mesas, resultados 2023 y un botón para sumarla o quitarla
+        de la estrategia.
+      </p>
+      <p class="chico" style="margin-bottom:0">
+        La leyenda avisa cuántas escuelas están geocodificadas. Las que no tienen ubicación no aparecen como punto,
+        pero <b>sí cuentan</b> en todas las tablas y análisis.
+      </p>
+    </div>
+  </div>
+
+  <div class="pie"><span>JxR · Comando Territorial · documento interno de campaña</span><span class="num">3</span></div>
+</section>
+
+<!-- ══════════════════════ 4 · VISTAS DE ANÁLISIS ══════════════════════ -->
+<section class="hoja">
+  <div class="cabecera">
+    <div class="marca">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="62" height="62" rx="16" fill="#E14F82"/><text x="11" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">J</text><text x="38" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">R</text><text x="24" y="41" font-family="Poppins,sans-serif" font-weight="800" font-size="21" fill="#14213D" transform="rotate(-8 32 32)">x</text><path d="M13 51 Q32 59 51 49" stroke="#14213D" stroke-width="4.5" stroke-linecap="round" fill="none"/></svg>
+      <div class="nombre"><small>Comando</small><b>Territorial</b></div>
+    </div>
+    <div class="seccion">Vistas del mapa · 2 de 2</div>
+  </div>
+
+  <h2>Oportunidad — dónde conviene invertir primero</h2>
+  <div class="fila">
+    <figure style="flex:1.3">
+      <img src="img/07-vista-oportunidad.jpg" alt="Vista Oportunidad con el índice por circuito">
+    </figure>
+    <div style="flex:1">
+      <p>
+        Cada circuito lleva su <b>Índice de Oportunidad de 0 a 100</b>, escrito sobre el mapa. Combina tres cosas,
+        normalizadas entre los 47 circuitos:
+      </p>
+      <ul>
+        <li><b>40%</b> voto disperso 2023: la base propia potencial.</li>
+        <li><b>35%</b> bolsa 2025: blancos más ausentes, los votos que hoy no eligió nadie.</li>
+        <li><b>25%</b> competitividad 2025: qué tan peleado quedó.</li>
+      </ul>
+      <p>
+        Un índice alto significa <b>mucha base propia, muchos votos sin dueño y elección peleada</b>: las tres
+        condiciones para que el trabajo territorial rinda.
+      </p>
+      <p class="chico" style="margin-bottom:0">
+        Arriba, la barra <b>«Dónde invertir primero»</b> tiene los tres primeros como botón: un clic abre la ficha
+        de ese circuito. Hoy encabezan 15B (83), 14 (82) y 15 (75).
+      </p>
+    </div>
+  </div>
+
+  <h2 style="margin-top:4mm">2023↔2025 — cómo evolucionó cada circuito</h2>
+  <div class="fila">
+    <div style="flex:1">
+      <p>
+        Elegís <b>una lista de 2023</b> y <b>una agrupación de 2025</b> en los dos selectores, y el mapa pinta los
+        puntos de porcentaje que ganó o perdió en cada circuito.
+      </p>
+      <p>
+        Si hubo caídas, la escala es divergente: <b>verde</b> creció, <b>rojo</b> cayó. Si creció en todos los
+        circuitos, la escala pasa a intensidad —más oscuro creció más— y la leyenda lo aclara.
+      </p>
+      <div class="nota cuidado" style="margin-bottom:0">
+        <div class="titulo">Leer como tendencia</div>
+        <p>
+          Son elecciones distintas (una municipal y provincial, otra nacional) y el 2025 es provisorio. La
+          comparación muestra el <b>movimiento del territorio</b>, no una equivalencia entre listas.
+        </p>
+      </div>
+    </div>
+    <figure style="flex:1.3">
+      <img src="img/08-vista-evolucion.jpg" alt="Vista 2023 a 2025 con el delta por circuito">
+    </figure>
+  </div>
+
+  <h2 style="margin-top:4mm">Prioridad — la frontera de los 20.000</h2>
+  <div class="fila">
+    <figure style="flex:1.3">
+      <img src="img/06-vista-prioridad.jpg" alt="Vista Prioridad con escuelas por tier">
+    </figure>
+    <div style="flex:1">
+      <p>
+        Trabaja a nivel <b>escuela</b> y responde «¿dónde actuamos primero?». Cada escuela recibe un puntaje
+        (volumen de voto disperso, propensión y descubierto de cobertura) y cae en un tier:
+      </p>
+      <ul>
+        <li><b>Tier A</b>: dentro de la frontera que suma la meta de 20.000 votos.</li>
+        <li><b>Tier B</b>: el anillo siguiente. <b>Tier C</b>: el resto.</li>
+      </ul>
+      <p>
+        El <b>borde rojo</b> marca las escuelas cuyo circuito no tiene ningún referente asignado, y el relleno del
+        circuito son los <b>votos huérfanos</b>: voto disperso sin nadie que lo trabaje.
+      </p>
+      <p class="chico" style="margin-bottom:0">
+        Es la vista que conecta el análisis con el operativo: dice dónde hay votos y nadie a cargo.
+      </p>
+    </div>
+  </div>
+
+  <div class="pie"><span>JxR · Comando Territorial · documento interno de campaña</span><span class="num">4</span></div>
+</section>
+
+<!-- ══════════════════════ 5 · FICHA DEL CIRCUITO ══════════════════════ -->
+<section class="hoja">
+  <div class="cabecera">
+    <div class="marca">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="62" height="62" rx="16" fill="#E14F82"/><text x="11" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">J</text><text x="38" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">R</text><text x="24" y="41" font-family="Poppins,sans-serif" font-weight="800" font-size="21" fill="#14213D" transform="rotate(-8 32 32)">x</text><path d="M13 51 Q32 59 51 49" stroke="#14213D" stroke-width="4.5" stroke-linecap="round" fill="none"/></svg>
+      <div class="nombre"><small>Comando</small><b>Territorial</b></div>
+    </div>
+    <div class="seccion">La ficha del circuito</div>
+  </div>
+
+  <p style="margin-bottom:4mm">
+    Un clic en cualquier circuito del mapa abre su ficha a la derecha. Es el corazón del sistema: todo lo que se
+    sabe de ese territorio en una sola columna, de arriba hacia abajo. Cada bloque se despliega con el triangulito.
+  </p>
+
+  <div class="fila">
+    <figure style="flex:0 0 52mm">
+      <img class="tope-88" src="img/09-panel-circuito.jpg" alt="Ficha del circuito 13">
+      <figcaption>La ficha del circuito 13, con sus 10.898 electores.</figcaption>
+    </figure>
+
+    <div style="flex:1">
+      <h3 style="margin-top:0">Padrón del circuito</h3>
+      <p>
+        Electores totales, división por sexo y las cuatro franjas etarias estimadas. El enlace celeste despliega
+        las <b>escuelas de votación</b>: un clic en cualquiera abre su ficha y la marca en el mapa. El icono 🏫
+        indica que está ubicada; 📋 que todavía no tiene coordenadas y abre la ficha igual.
+      </p>
+      <p class="chico">
+        El buscador de electores es para <b>soporte logístico</b>: decirle a alguien dónde le toca votar.
+        No sirve —ni debe usarse— para inferir nada sobre su voto.
+      </p>
+
+      <h3>Resultados 2023 · Concejal</h3>
+      <p>
+        Votos totales, blancos, nulos y el porcentaje sobre el padrón actual. Al desplegarlo aparece el ranking de
+        listas con barras.
+      </p>
+
+      <h3>Resultados 2025 · Diputados</h3>
+      <p>
+        Quién ganó y por cuánto sobre el segundo. La diferencia se colorea sola: <b>roja</b> si son 150 votos o
+        menos —circuito en disputa— y <b>amarilla</b> hasta 500 —competitivo—. Debajo, participación, blancos y
+        ausentes, que son la bolsa de crecimiento.
+      </p>
+    </div>
+  </div>
+
+  <div class="fila" style="margin-top:2mm">
+    <div style="flex:1">
+      <h3 style="margin-top:0">Mesa por mesa</h3>
+      <p>
+        El enlace «N mesas · las más peleadas primero» abre la tabla ordenada por diferencia entre el primero y el
+        segundo, con blancos y ausentes de cada mesa. Las diferencias de <b>20 votos o menos salen en rojo</b>:
+        son las mesas que se dan vuelta con una jornada de trabajo.
+      </p>
+
+      <h3>Perfil social · Censo 2022</h3>
+      <p>
+        Habitantes, hogares y cuatro indicadores comparados <b>contra el promedio de la ciudad</b>. Si el valor
+        supera al de la ciudad se pinta en rojo, porque ahí hay una agenda concreta. Las referencias de la ciudad
+        son: NBI 7,7% · hacinamiento 14,6% · sin cloaca 14,1% · desocupación 10,7% · sin cobertura de salud 29,9%.
+      </p>
+      <p>
+        Desplegado agrega <b>cómo trabaja la gente</b> de la zona y sus condiciones de vida.
+      </p>
+
+      <h3>Barrios del circuito</h3>
+      <p>
+        Los barrios oficiales que lo componen, como botones. <b>Un clic lo resalta en el mapa</b> y lo encuadra;
+        volver a tocarlo quita la marca. Si el barrio se reparte entre circuitos, el porcentaje dice cuánto cae en este.
+      </p>
+    </div>
+
+    <figure style="flex:0 0 52mm;margin-bottom:0">
+      <img class="tope-88-abajo" src="img/10-mesas-peleadas.jpg" alt="Tabla de mesas mas peleadas del circuito">
+      <figcaption>La tabla mesa por mesa de 2025, con las diferencias más chicas arriba.</figcaption>
+    </figure>
+  </div>
+
+  <div class="nota" style="margin-top:3mm">
+    <div class="titulo">Para qué sirve el perfil social</div>
+    <p>
+      Para elegir el <b>mensaje y la propuesta</b> de cada zona, nunca para predecir el voto. Una zona con
+      desocupación por encima del 10,7% de la ciudad pide agenda de trabajo y oficios; una con muchos adultos
+      mayores, salud; una con hogares sin cloaca, infraestructura.
+    </p>
+  </div>
+
+  <div class="pie"><span>JxR · Comando Territorial · documento interno de campaña</span><span class="num">5</span></div>
+</section>
+
+<!-- ══════════════════════ 6 · PLAN TERRITORIAL ══════════════════════ -->
+<section class="hoja">
+  <div class="cabecera">
+    <div class="marca">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="62" height="62" rx="16" fill="#E14F82"/><text x="11" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">J</text><text x="38" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">R</text><text x="24" y="41" font-family="Poppins,sans-serif" font-weight="800" font-size="21" fill="#14213D" transform="rotate(-8 32 32)">x</text><path d="M13 51 Q32 59 51 49" stroke="#14213D" stroke-width="4.5" stroke-linecap="round" fill="none"/></svg>
+      <div class="nombre"><small>Comando</small><b>Territorial</b></div>
+    </div>
+    <div class="seccion">Plan territorial y ficha impresa</div>
+  </div>
+
+  <h2><span class="paso">1</span> Cargar el plan de un circuito</h2>
+  <div class="fila">
+    <div style="flex:1.1">
+      <p>
+        Al final de la ficha está <b>Plan territorial</b>: cinco campos que convierten el análisis en algo
+        asignable. Se escribe directo y se guarda con el botón <b>Guardar</b>.
+      </p>
+      <table>
+        <tr><td>Segmento</td><td>A quién le hablamos acá.</td></tr>
+        <tr><td>Problemática</td><td>Qué duele en la zona, según el perfil social y el territorio.</td></tr>
+        <tr><td>Mensaje</td><td>La idea fuerza, en una frase.</td></tr>
+        <tr><td>Propuesta</td><td>Qué se ofrece concreto.</td></tr>
+        <tr><td>Abordaje</td><td>Cómo se trabaja: puerta a puerta, referentes, actividades.</td></tr>
+      </table>
+      <p>
+        El encabezado muestra el estado: <b>borrador</b> con el avance (por ejemplo 3/5 campos) o
+        <b>validada</b> cuando el equipo acordó el plan. Se alterna con «Marcar validada».
+      </p>
+      <p>
+        El botón <b>Borrador con Elena</b> le pide la propuesta completa cruzando 2023, 2025, blancos, ausentes y
+        el censo. Después se copia acá y se ajusta: la decisión política siempre queda en manos del equipo.
+      </p>
+    </div>
+    <figure style="flex:0 0 50mm;margin-bottom:0">
+      <img class="tope-95" src="img/11-plan-territorial.jpg" alt="Formulario del plan territorial">
+    </figure>
+  </div>
+
+  <h2 style="margin-top:5mm"><span class="paso">2</span> Imprimir la ficha del circuito</h2>
+  <p>
+    El <b>icono de impresora</b> en el encabezado de la ficha abre una hoja lista para imprimir o guardar como PDF,
+    pensada para el referente que no va a abrir la aplicación. Trae todo en una carilla: padrón y escuelas, perfil
+    social contra la ciudad, resultados 2023 y 2025, el plan territorial, los barrios y las mesas más peleadas.
+  </p>
+  <div class="fila">
+    <figure style="flex:0 0 76mm;margin-bottom:0">
+      <img class="tope-120" src="img/22-ficha-imprimible.jpg" alt="Ficha del circuito lista para imprimir">
+      <figcaption>La hoja del circuito 13, tal como sale impresa.</figcaption>
+    </figure>
+    <div style="flex:1">
+      <table>
+        <tr><td>Padrón</td><td>Electores, sexo, franjas etarias y las escuelas del circuito.</td></tr>
+        <tr><td>Perfil social</td><td>Los cinco indicadores del censo con el valor de la ciudad al lado; en rojo los que están peor que el promedio.</td></tr>
+        <tr><td>Resultados</td><td>2023 por Concejal y 2025 por Diputados, con participación, blancos y ausentes.</td></tr>
+        <tr><td>Plan</td><td>Los cinco campos, y si está validado o es borrador.</td></tr>
+        <tr><td>Barrios</td><td>Los barrios que lo componen, con su porcentaje.</td></tr>
+        <tr><td>Mesas</td><td>Las doce mesas más peleadas de 2025.</td></tr>
+      </table>
+      <p class="chico" style="margin-bottom:0">
+        La barra gris de arriba con el botón «Imprimir» <b>no sale impresa</b>. Para guardarla como archivo, elegí
+        «Guardar como PDF» en el destino de impresión.
+      </p>
+    </div>
+  </div>
+
+  <div class="pie"><span>JxR · Comando Territorial · documento interno de campaña</span><span class="num">6</span></div>
+</section>
+
+
+<!-- ══════════════════════ 7 · ELENA ══════════════════════ -->
+<section class="hoja">
+  <div class="cabecera">
+    <div class="marca">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="62" height="62" rx="16" fill="#E14F82"/><text x="11" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">J</text><text x="38" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">R</text><text x="24" y="41" font-family="Poppins,sans-serif" font-weight="800" font-size="21" fill="#14213D" transform="rotate(-8 32 32)">x</text><path d="M13 51 Q32 59 51 49" stroke="#14213D" stroke-width="4.5" stroke-linecap="round" fill="none"/></svg>
+      <div class="nombre"><small>Comando</small><b>Territorial</b></div>
+    </div>
+    <div class="seccion">Elena · la asistente de análisis</div>
+  </div>
+
+  <p style="margin-bottom:3mm">
+    Elena está en todas las pantallas, en el botón redondo de abajo a la derecha. No es un buscador: es una
+    analista que <b>consulta la base antes de responder</b>. Debajo de cada respuesta figura qué herramientas usó,
+    así se puede rastrear de dónde salió cada número.
+  </p>
+
+  <div class="fila">
+    <figure style="flex:0 0 54mm">
+      <img class="tope-95" src="img/12-elena-chat.jpg" alt="Conversacion con Elena">
+      <figcaption>Elena responde y deja el rastro: «consultó: voto blanco, mostrar en mapa».</figcaption>
+    </figure>
+
+    <div style="flex:1">
+      <h3 style="margin-top:0">Qué se le puede preguntar</h3>
+      <table>
+        <tr><td>Operativo</td><td>Cobertura, quién tiene cada circuito, tareas pendientes, circuitos sin asignar.</td></tr>
+        <tr><td>Padrón</td><td>Cuántos electores hay en un segmento, dónde se concentran, dónde vota una persona.</td></tr>
+        <tr><td>Resultados</td><td>Ranking de listas, quién ganó cada mesa, rendimiento de una lista, voto en blanco, corte de boleta 2023.</td></tr>
+        <tr><td>Oportunidades</td><td>Dónde se perdió por menos de N votos, el Índice de Potencial Electoral, la evolución 2023→2025.</td></tr>
+        <tr><td>Territorio</td><td>Perfil social de un circuito o barrio, ranking social, qué barrios componen un circuito.</td></tr>
+        <tr><td>Planes</td><td>Qué fichas territoriales hay cargadas y validadas, y borradores nuevos.</td></tr>
+      </table>
+
+      <h3>Cómo pedirle bien las cosas</h3>
+      <ul>
+        <li>Se le puede hablar normal, sin comandos. Ante una ambigüedad <b>asume el supuesto más razonable y lo aclara al final</b>, en lugar de frenar a repreguntar.</li>
+        <li>Para simulaciones muestra la cuenta: «si captamos el 30% de los 3.594 blancos serían ~1.078 votos».</li>
+        <li>Si le pedís ver algo («mostrame el 15B»), <b>el mapa se mueve solo</b>; si estabas en otra pantalla, te lleva.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 style="margin-top:2mm">Elena pinta el mapa</h2>
+  <p>
+    Cuando un análisis da un resultado por circuito, Elena lo <b>lleva al mapa</b>: «pintame los votos en blanco
+    de 2025 por circuito», «marcá los circuitos donde perdimos por menos de 100 votos». Consulta los datos y el
+    mapa se pinta con el valor escrito sobre cada circuito.
+  </p>
+  <figure>
+    <img class="tope-80" src="img/13-mapa-pintado-por-elena.jpg" alt="El mapa pintado por Elena con el porcentaje de voto en blanco 2025">
+    <figcaption>
+      Los 47 circuitos con su porcentaje de voto en blanco de 2025. Arriba a la izquierda queda la etiqueta
+      <b>«Elena: …»</b> con el rango, y se quita con su X. La leyenda del mapa muestra la escala usada.
+    </figcaption>
+  </figure>
+
+  <div class="fila">
+    <div style="flex:1">
+      <div class="nota" style="margin-bottom:0">
+        <div class="titulo">Preguntar sobre un circuito puntual</div>
+        <p>
+          En la ficha de cada circuito hay un bloque <b>«Preguntale a Elena sobre este circuito»</b> con un campo
+          libre y cinco atajos. La pregunta viaja ya con el contexto del circuito, así que no hace falta repetirlo.
+        </p>
+      </div>
+    </div>
+    <div style="flex:1">
+      <div class="nota cuidado" style="margin-bottom:0">
+        <div class="titulo">Qué no hace Elena</div>
+        <p>
+          No inventa datos: si una consulta no devuelve algo, lo dice. Y <b>nunca especula sobre el voto de una
+          persona</b>: el análisis político es siempre agregado por escuela, circuito o cohorte.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="pie"><span>JxR · Comando Territorial · documento interno de campaña</span><span class="num">7</span></div>
+</section>
+
+<!-- ══════════════════════ 8 · ESTRATEGIA ══════════════════════ -->
+<section class="hoja">
+  <div class="cabecera">
+    <div class="marca">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="62" height="62" rx="16" fill="#E14F82"/><text x="11" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">J</text><text x="38" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">R</text><text x="24" y="41" font-family="Poppins,sans-serif" font-weight="800" font-size="21" fill="#14213D" transform="rotate(-8 32 32)">x</text><path d="M13 51 Q32 59 51 49" stroke="#14213D" stroke-width="4.5" stroke-linecap="round" fill="none"/></svg>
+      <div class="nombre"><small>Comando</small><b>Territorial</b></div>
+    </div>
+    <div class="seccion">Estrategia · cuatro mesas de trabajo</div>
+  </div>
+
+  <h2>Bancas · D&rsquo;Hondt — cuántos votos vale una banca</h2>
+  <figure>
+    <img class="tope-80" src="img/16-estrategia-bancas.jpg" alt="Simulador de reparto de bancas por D'Hondt">
+    <figcaption>
+      El reparto de las 18 bancas de concejal sobre los resultados 2023. El <b>piso efectivo</b> son los votos que
+      hacen falta para arrebatar la última banca.
+    </figcaption>
+  </figure>
+  <p>
+    En Tucumán el reparto es <b>D&rsquo;Hondt puro por lista y sin piso legal</b>: la Constitución (art. 43) ordena
+    dividir los votos de cada lista «sin exceptuarse de este cálculo lista alguna». Los acoples suman al mismo
+    candidato a intendente, pero <b>en concejales cada lista compite por separado</b>: fragmentarse cuesta bancas.
+    El cálculo está verificado contra la adjudicación oficial de 2023, banca por banca.
+  </p>
+  <ul>
+    <li><b>Piso efectivo</b>, <b>listas que entran</b> y <b>votos positivos</b> del escenario elegido.</li>
+    <li><b>Cuántos votos hace falta para cada banca</b>: 1 banca 10.788 votos, 2 bancas 22.104, 3 bancas 33.174, y así.</li>
+    <li><b>Simular listas unificadas</b>: marcás dos o más listas de la tabla (o cargás un universo guardado) y muestra cuántas bancas obtendrían yendo juntas y a quién se las sacan.</li>
+    <li>El selector de arriba cambia entre <b>Concejal (18 bancas)</b> y <b>Legislador (19 por la Sección Capital)</b>, y los campos de bancas y piso permiten probar otros escenarios.</li>
+  </ul>
+
+  <div class="fila" style="margin-top:2mm">
+    <div style="flex:1">
+      <h3 style="margin-top:0">Voto disperso</h3>
+      <p class="chico">
+        La <b>Frontera 20K</b> rankea las escuelas por prioridad y marca el conjunto mínimo que suma la meta de
+        20.000 votos, con los votos huérfanos aparte. La otra pestaña lista escuelas por umbral de votos. La
+        <b>selección de listas</b> es editable y la comparten el mapa, la estrategia y Elena. Todo se exporta a CSV.
+      </p>
+    </div>
+    <div style="flex:1">
+      <h3 style="margin-top:0">Universo territorial</h3>
+      <p class="chico">
+        Elegís un universo de listas guardado y ves dónde están sus votos, por <b>barrio, circuito, escuela o
+        mesa</b>: votos, porcentaje, electores, blancos, ausentes y participación. Cada fila se despliega para ver
+        el aporte lista por lista.
+      </p>
+    </div>
+    <div style="flex:1">
+      <h3 style="margin-top:0">Informes</h3>
+      <p class="chico">
+        El botón <b>«Generar informe ahora»</b> hace que Elena recorra todo —cobertura, estrategia, oportunidades,
+        alertas y planes cargados— y escriba el parte, con tres acciones concretas para la semana. Queda guardado y
+        lo ve todo el equipo.
+      </p>
+    </div>
+  </div>
+
+  <div class="fila" style="margin-top:1mm">
+    <figure style="flex:1;margin-bottom:0">
+      <img class="tope-80" src="img/14-estrategia-disperso.jpg" alt="Pestana de voto disperso con la frontera 20K">
+      <figcaption>Voto disperso · Frontera 20K</figcaption>
+    </figure>
+    <figure style="flex:1;margin-bottom:0">
+      <img class="tope-80" src="img/17-estrategia-informes.jpg" alt="Informe de situacion generado por Elena">
+      <figcaption>Un informe de situación desplegado</figcaption>
+    </figure>
+  </div>
+
+  <div class="pie"><span>JxR · Comando Territorial · documento interno de campaña</span><span class="num">8</span></div>
+</section>
+
+<!-- ══════════════════════ 9 · BÚNKER Y TELÉFONO ══════════════════════ -->
+<section class="hoja">
+  <div class="cabecera">
+    <div class="marca">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="62" height="62" rx="16" fill="#E14F82"/><text x="11" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">J</text><text x="38" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">R</text><text x="24" y="41" font-family="Poppins,sans-serif" font-weight="800" font-size="21" fill="#14213D" transform="rotate(-8 32 32)">x</text><path d="M13 51 Q32 59 51 49" stroke="#14213D" stroke-width="4.5" stroke-linecap="round" fill="none"/></svg>
+      <div class="nombre"><small>Comando</small><b>Territorial</b></div>
+    </div>
+    <div class="seccion">Búnker y uso en el teléfono</div>
+  </div>
+
+  <h2>Búnker — el escrutinio propio, en vivo</h2>
+  <p>
+    La noche de la elección, cada fiscal carga el telegrama de su mesa desde el teléfono y el tablero proyecta
+    resultados y bancas mesa a mesa, <b>horas antes de los datos oficiales</b>.
+  </p>
+
+  <div class="fila">
+    <div style="flex:1">
+      <h3 style="margin-top:0">Antes: configurar y abrir</h3>
+      <p>
+        Con el búnker cerrado se define el <b>nombre de la elección</b>, la categoría, las <b>bancas en juego</b>,
+        las <b>mesas esperadas</b> (1.350 en Capital) y las <b>listas que compiten</b>, una por línea y escritas
+        como van a figurar en el telegrama. Después, <b>Abrir el búnker</b>.
+      </p>
+      <h3>Durante: cargar mesas</h3>
+      <p>
+        Número de mesa, circuito, electores (opcional) y los votos de cada lista, más blancos y nulos. El total lo
+        calcula el sistema. Si una mesa <b>ya estaba cargada, se reemplaza</b>: así se corrigen errores sin
+        duplicar. Cada carga confirma con «Mesa N cargada ✓».
+      </p>
+    </div>
+    <div style="flex:1">
+      <h3 style="margin-top:0">El tablero</h3>
+      <p>
+        Mesas escrutadas y porcentaje de avance, votantes, blancos y nulos; el <b>resultado en vivo con las bancas
+        proyectadas</b> por D&rsquo;Hondt; el puntero de cada circuito; y las últimas mesas cargadas. Se refresca
+        solo cada 15 segundos.
+      </p>
+      <h3>Al terminar</h3>
+      <p>
+        El superadmin puede <b>cerrar</b> el búnker —deja de recibir cargas y los datos quedan— y <b>reiniciar</b>,
+        que borra todas las mesas para arrancar otra elección. Reiniciar pide confirmación y no se puede deshacer.
+      </p>
+    </div>
+  </div>
+  <figure>
+    <img class="tope-45" src="img/21-bunker-vivo.jpg" alt="Tablero del bunker en vivo con bancas proyectadas">
+    <figcaption>
+      El tablero con tres mesas cargadas: ya proyecta el reparto de las 18 bancas, el puntero de cada circuito y
+      las últimas cargas.
+    </figcaption>
+  </figure>
+
+  <h2 style="margin-top:3mm">En el teléfono</h2>
+  <div class="fila">
+    <figure style="flex:1;margin-bottom:0"><img class="tope-70" src="img/23-mobile-menu.jpg" alt="Menu en el telefono"><figcaption>Las secciones pasan a un menú desplegable.</figcaption></figure>
+    <figure style="flex:1;margin-bottom:0"><img class="tope-70" src="img/24-mobile-hoja.jpg" alt="Ficha del circuito en el telefono"><figcaption>La ficha se abre como hoja inferior y deja ver el mapa.</figcaption></figure>
+    <figure style="flex:1;margin-bottom:0"><img class="tope-70" src="img/25-mobile-bunker.jpg" alt="Carga de mesa en el telefono"><figcaption>La carga del búnker, pensada para el fiscal.</figcaption></figure>
+  </div>
+  <p style="margin-top:2mm">
+    Todo el sistema funciona en el teléfono. Las vistas del mapa se deslizan con el dedo, las capas se agrupan
+    detrás del botón <b>Capas</b> (con el número de activas), la leyenda arranca cerrada para no tapar el mapa y
+    las tablas anchas se deslizan de costado.
+  </p>
+
+  <div class="nota cuidado" style="margin-bottom:0">
+    <div class="titulo">Tres reglas de uso</div>
+    <p>
+      <b>1.</b> El voto es secreto: el análisis político es siempre agregado por escuela, circuito o cohorte, nunca
+      sobre una persona. &nbsp;<b>2.</b> Los datos de contacto del padrón y de las personas del operativo se usan
+      para logística y organización, y no se comparten fuera del equipo (Ley 25.326). &nbsp;<b>3.</b> Los
+      resultados 2025 son <b>provisorios</b>: cuando se cite un número de 2025 conviene aclararlo.
+    </p>
+  </div>
+
+  <div class="pie"><span>JxR · Comando Territorial · documento interno de campaña</span><span class="num">9</span></div>
+</section>
+
+</body>
+</html>
