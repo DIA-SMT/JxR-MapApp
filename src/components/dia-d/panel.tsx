@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Activity, ClipboardCheck, Lock, Phone, Settings, TrendingUp, Unlock, Users } from "lucide-react";
+import { AlertTriangle, Activity, ClipboardCheck, ListOrdered, Lock, Phone, Settings, TrendingUp, Unlock, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   contacto,
@@ -17,13 +17,15 @@ import type { Persona } from "@/lib/tipos";
 import { Escrutinio } from "./escrutinio";
 import { Fiscales } from "./fiscales";
 import { Incidencias, Participacion } from "./jornada";
+import { PrioridadMesas } from "./prioridad";
 
 const numero = (n: number) => n.toLocaleString("es-AR");
 
-type Seccion = "fiscales" | "participacion" | "incidencias" | "escrutinio" | "config";
+type Seccion = "fiscales" | "prioridad" | "participacion" | "incidencias" | "escrutinio" | "config";
 
 const SECCIONES: Array<{ clave: Seccion; etiqueta: string; corta: string; icono: typeof Users; detalle: string }> = [
   { clave: "fiscales", etiqueta: "Fiscales", corta: "Fiscales", icono: Users, detalle: "Quién está en cada mesa y contacto en un clic" },
+  { clave: "prioridad", etiqueta: "Prioridad", corta: "Prior.", icono: ListOrdered, detalle: "Con fiscales limitados, qué mesas cubrir primero" },
   { clave: "participacion", etiqueta: "Participación", corta: "Particip.", icono: TrendingUp, detalle: "Cuánta gente votó a cada corte horario y dónde traccionar" },
   { clave: "incidencias", etiqueta: "Incidencias", corta: "Incid.", icono: AlertTriangle, detalle: "Problemas de la jornada y su resolución" },
   { clave: "escrutinio", etiqueta: "Escrutinio", corta: "Escrut.", icono: ClipboardCheck, detalle: "Carga de telegramas y proyección de bancas" },
@@ -31,9 +33,9 @@ const SECCIONES: Array<{ clave: Seccion; etiqueta: string; corta: string; icono:
 ];
 
 /**
- * DÍA D — el comando de la jornada electoral. Cuatro mesas de trabajo
- * (fiscales, participación, incidencias y escrutinio) más la configuración,
- * que es donde el administrador define todo lo de la elección concreta.
+ * DÍA D — el comando de la jornada electoral. Cinco mesas de trabajo
+ * (fiscales, prioridad, participación, incidencias y escrutinio) más la
+ * configuración, que es donde el administrador define todo lo de la elección.
  */
 export function DiaD({ esSuperadmin }: { esSuperadmin: boolean }) {
   const [supabase] = useState(crearClienteNavegador);
@@ -171,6 +173,9 @@ export function DiaD({ esSuperadmin }: { esSuperadmin: boolean }) {
 
       {seccion === "fiscales" && (
         <Fiscales supabase={supabase} config={config} personas={personas} onCambio={cargarResumen} />
+      )}
+      {seccion === "prioridad" && (
+        <PrioridadMesas supabase={supabase} fiscalesAsignados={resumen.conFiscal} totalMesas={mesas.length} />
       )}
       {seccion === "participacion" && <Participacion supabase={supabase} config={config} mesas={mesas} />}
       {seccion === "incidencias" && <Incidencias supabase={supabase} mesas={mesas} />}
