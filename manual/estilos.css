@@ -191,3 +191,71 @@ figure img.tope-88 { max-height: 88mm; object-fit: cover; object-position: top; 
 figure img.tope-88-abajo { max-height: 88mm; object-fit: cover; object-position: bottom; }
 figure img.tope-70 { max-height: 70mm; object-fit: cover; object-position: top; }
 figure img.tope-45 { max-height: 45mm; object-fit: cover; object-position: top; }
+
+/* ── Tapa: hoja rosa a sangre completa ─────────────────────────────────────── */
+.tapa {
+  background: var(--rosa);
+  color: #fff;
+  padding: 26mm 20mm 20mm;
+  display: flex;
+  flex-direction: column;
+}
+/* El isotipo va en blanco sobre el rosa: se invierte la paleta de la insignia. */
+.tapa .insignia { width: 34mm; height: 34mm; }
+.tapa .insignia rect { fill: #fff; }
+.tapa .insignia text { fill: var(--rosa); }
+.tapa .insignia text.tachada { fill: var(--marino); }
+.tapa .insignia path { stroke: var(--marino); }
+
+.tapa .kicker {
+  font-size: 8pt;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  font-weight: 700;
+  opacity: 0.8;
+}
+.tapa h1 {
+  font-size: 44pt;
+  line-height: 0.98;
+  margin: 0;
+  letter-spacing: -0.035em;
+}
+/* color explícito: la regla base de p (tinta) le gana a heredar el blanco */
+.tapa .bajada {
+  color: #fff;
+  font-size: 12pt;
+  line-height: 1.4;
+  font-weight: 500;
+  max-width: 120mm;
+  opacity: 0.95;
+  margin: 6mm 0 0;
+}
+/* el bloque de título queda centrado y los créditos anclados al pie */
+.tapa .centro { margin: auto 0; }
+.tapa .regla { height: 1.5px; background: rgba(255,255,255,0.35); margin: 10mm 0 7mm; }
+.tapa h4 {
+  font-size: 7.5pt;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 800;
+  opacity: 0.75;
+  margin: 0 0 3mm;
+}
+.tapa .indice { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12mm; }
+.tapa .indice div {
+  display: flex;
+  gap: 4mm;
+  font-size: 8.5pt;
+  padding: 1.5mm 0;
+  border-bottom: 1px solid rgba(255,255,255,0.22);
+}
+.tapa .indice b { font-weight: 800; opacity: 0.7; min-width: 4mm; }
+.tapa .creditos {
+  margin-top: auto;
+  font-size: 7.5pt;
+  opacity: 0.8;
+  border-top: 1.5px solid rgba(255,255,255,0.35);
+  padding-top: 3mm;
+  display: flex;
+  justify-content: space-between;
+}

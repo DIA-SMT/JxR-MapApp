@@ -40,7 +40,7 @@ for (const archivo of readdirSync(ORIGEN).filter((f) => f.endsWith(".png")).sort
 
   await pag.setViewport({ width: ancho, height: alto, deviceScaleFactor: 1 });
   await pag.setContent(
-    `<style>html,body{margin:0;padding:0;background:#070a10;overflow:hidden}
+    `<style>html,body{margin:0;padding:0;background:#ffffff;overflow:hidden}
      img{display:block;width:${ancho}px;height:${Math.round(hOrig * escala)}px}</style>
      <img src="data:image/png;base64,${bytes.toString("base64")}">`,
     { waitUntil: "load" },

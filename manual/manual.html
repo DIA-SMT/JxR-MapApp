@@ -7,29 +7,56 @@
 </head>
 <body>
 
-<!-- ══════════════════════ 1 · PORTADA ══════════════════════ -->
-<section class="hoja">
-  <div style="display:flex;align-items:center;gap:5mm;margin-bottom:9mm">
-    <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="width:22mm;height:22mm">
-      <rect x="1" y="1" width="62" height="62" rx="16" fill="#E14F82"/>
-      <text x="11" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">J</text>
-      <text x="38" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">R</text>
-      <text x="24" y="41" font-family="Poppins,sans-serif" font-weight="800" font-size="21" fill="#14213D" transform="rotate(-8 32 32)">x</text>
-      <path d="M13 51 Q32 59 51 49" stroke="#14213D" stroke-width="4.5" stroke-linecap="round" fill="none"/>
-    </svg>
-    <div>
-      <div style="font-size:7pt;letter-spacing:0.22em;text-transform:uppercase;color:#8b95a9;font-weight:600">Comando Territorial</div>
-      <div style="font-size:19pt;font-weight:800;letter-spacing:-0.02em;line-height:1.1">San Miguel de Tucumán</div>
-    </div>
+<!-- ══════════════════════ 1 · TAPA ══════════════════════ -->
+<section class="hoja tapa">
+  <svg class="insignia" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <rect x="1" y="1" width="62" height="62" rx="16"/>
+    <text x="11" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30">J</text>
+    <text x="38" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30">R</text>
+    <text class="tachada" x="24" y="41" font-family="Poppins,sans-serif" font-weight="800" font-size="21" transform="rotate(-8 32 32)">x</text>
+    <path d="M13 51 Q32 59 51 49" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+  </svg>
+
+  <div class="centro">
+    <div class="kicker">Comando Territorial · San Miguel de Tucumán</div>
+    <h1 style="margin-top:4mm">Manual<br>de uso</h1>
+    <p class="bajada">
+      Cómo usar cada pantalla: el mapa y sus vistas, la ficha de cada circuito, el plan territorial,
+      Elena, la estrategia de bancas y el búnker de la noche de la elección.
+    </p>
   </div>
 
-  <h1>Manual de uso</h1>
-  <p style="font-size:10.5pt;color:#55617a;line-height:1.45;margin-bottom:7mm">
-    Cómo usar cada pantalla: el mapa, la ficha de cada circuito, el plan territorial, Elena,
-    la estrategia de bancas y el búnker de la noche de la elección.
-  </p>
+  <div class="regla"></div>
 
-  <h3 style="margin-top:0">Qué es</h3>
+  <h4>Contenido</h4>
+  <div class="indice">
+    <div><b>2</b> Qué es y con qué datos trabaja</div>
+    <div><b>6</b> El plan territorial y la ficha impresa</div>
+    <div><b>3</b> El mapa: Operativo, Padrón y Escuelas</div>
+    <div><b>7</b> Elena: consultas y análisis en el mapa</div>
+    <div><b>4</b> Oportunidad, 2023↔2025 y Prioridad</div>
+    <div><b>8</b> Estrategia y reparto de bancas</div>
+    <div><b>5</b> La ficha del circuito</div>
+    <div><b>9</b> Búnker y uso en el teléfono</div>
+  </div>
+
+  <div class="creditos">
+    <span>Dirección de Inteligencia Artificial · Municipalidad de San Miguel de Tucumán</span>
+    <span>Documento interno de campaña</span>
+  </div>
+</section>
+
+<!-- ══════════════════════ 2 · QUÉ ES Y CÓMO SE ENTRA ══════════════════════ -->
+<section class="hoja">
+  <div class="cabecera">
+    <div class="marca">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="62" height="62" rx="16" fill="#E14F82"/><text x="11" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">J</text><text x="38" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">R</text><text x="24" y="41" font-family="Poppins,sans-serif" font-weight="800" font-size="21" fill="#14213D" transform="rotate(-8 32 32)">x</text><path d="M13 51 Q32 59 51 49" stroke="#14213D" stroke-width="4.5" stroke-linecap="round" fill="none"/></svg>
+      <div class="nombre"><small>Comando</small><b>Territorial</b></div>
+    </div>
+    <div class="seccion">Qué es y cómo se entra</div>
+  </div>
+
+  <h2>Qué es</h2>
   <p>
     Una herramienta de comando territorial: cruza <b>el padrón</b>, <b>los resultados electorales mesa a mesa</b>,
     <b>el perfil social del censo</b> y <b>el mapa de barrios</b> para responder tres preguntas — dónde estamos
@@ -46,84 +73,15 @@
     <tr><td>Territorio</td><td>20 distritos, 47 circuitos electorales, 128 escuelas de votación y los 327 barrios del mapa oficial municipal.</td></tr>
   </table>
 
-  <div class="nota cuidado">
-    <div class="titulo">Un límite que conviene tener presente</div>
-    <p>
-      Las mesas de la elección nacional 2025 <b>no llevan la misma numeración</b> que las del padrón provincial.
-      Por eso el 2025 se analiza por mesa y por circuito, sin bajar a escuela, y la comparación entre 2023 y 2025
-      se hace <b>por circuito</b>, donde los 47 códigos sí coinciden.
-    </p>
-  </div>
-
-  <h3>Contenido</h3>
-  <table style="margin-bottom:0">
-    <tr><td style="width:8mm">2</td><td>Acceso, encabezado y controles del mapa</td></tr>
-    <tr><td>3</td><td>Vistas del mapa: Operativo, Padrón y Escuelas</td></tr>
-    <tr><td>4</td><td>Vistas de análisis: Prioridad, Oportunidad y 2023↔2025</td></tr>
-    <tr><td>5</td><td>La ficha del circuito</td></tr>
-    <tr><td>6</td><td>El plan territorial y la ficha para imprimir</td></tr>
-    <tr><td>7</td><td>Elena: consultas, análisis pintado en el mapa e informes</td></tr>
-    <tr><td>8</td><td>Estrategia: voto disperso, universo y reparto de bancas</td></tr>
-    <tr><td>9</td><td>Búnker y uso en el teléfono</td></tr>
-  </table>
-
-  <div class="fila" style="margin-top:7mm">
-    <div style="flex:1">
-      <h3 style="margin-top:0">Dónde funciona</h3>
-      <p class="chico" style="margin-bottom:0">
-        En cualquier navegador, de la computadora o del teléfono. No hay nada que instalar y la sesión queda
-        abierta. Todas las pantallas están pensadas también para pantalla chica: el fiscal carga su mesa desde el
-        celular y el mismo tablero se ve en el búnker.
-      </p>
-    </div>
-    <div style="flex:1">
-      <h3 style="margin-top:0">Si algo no cuadra</h3>
-      <p class="chico" style="margin-bottom:0">
-        Cada número del sistema sale de una consulta a la base, no de una estimación. Si un dato no coincide con lo
-        que conocés del territorio, conviene avisarlo: puede ser un cruce de datos para revisar. Elena siempre deja
-        constancia de qué consultó para llegar a su respuesta.
-      </p>
-    </div>
-  </div>
-
-  <div class="pie">
-    <span>JxR · Comando Territorial · documento interno de campaña</span>
-    <span class="num">1</span>
-  </div>
-</section>
-
-<!-- ══════════════════════ 2 · ACCESO Y CONTROLES ══════════════════════ -->
-<section class="hoja">
-  <div class="cabecera">
-    <div class="marca">
-      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="62" height="62" rx="16" fill="#E14F82"/><text x="11" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">J</text><text x="38" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">R</text><text x="24" y="41" font-family="Poppins,sans-serif" font-weight="800" font-size="21" fill="#14213D" transform="rotate(-8 32 32)">x</text><path d="M13 51 Q32 59 51 49" stroke="#14213D" stroke-width="4.5" stroke-linecap="round" fill="none"/></svg>
-      <div class="nombre"><small>Comando</small><b>Territorial</b></div>
-    </div>
-    <div class="seccion">Acceso y controles del mapa</div>
-  </div>
-
-  <h2><span class="paso">1</span> Entrar al sistema</h2>
-  <div class="fila">
-    <div style="flex:1.15">
-      <p>
-        El acceso es solo para administradores de la campaña: se entra con el correo y la contraseña que te
-        entregaron. <b>La primera vez el sistema obliga a cambiar la contraseña</b> antes de dejar usar cualquier
-        pantalla; es a propósito, porque la clave inicial la conoce quien te dio de alta.
-      </p>
-      <p class="chico" style="margin-bottom:0">
-        No hay recupero automático de contraseña: se la pedís a quien administra los usuarios, que puede
-        restablecerla desde la pantalla <b>Usuarios</b>.
-      </p>
-    </div>
-    <figure style="flex:1;margin-bottom:0">
-      <img src="img/01-acceso.jpg" alt="Pantalla de acceso al sistema">
-    </figure>
-  </div>
-
-  <h2 style="margin-top:5mm"><span class="paso">2</span> El encabezado</h2>
+  <h2>Entrar y moverse</h2>
   <p>
-    Arriba están las secciones del sistema. El botón de sol o luna cambia entre modo claro y oscuro —el mapa
-    cambia de estilo con él— y el último cierra la sesión.
+    El acceso es solo para administradores, con el correo y la contraseña que te entregaron. <b>La primera vez el
+    sistema obliga a cambiar la contraseña</b>: la clave inicial la conoce quien te dio de alta. No hay recupero
+    automático — se la pedís a quien administra los usuarios, que puede restablecerla desde <b>Usuarios</b>.
+  </p>
+  <p>
+    Arriba están las secciones. El botón de sol o luna cambia entre modo claro y oscuro —el mapa cambia de estilo
+    con él— y el último cierra la sesión.
   </p>
   <table>
     <tr><td>Mapa</td><td>La pantalla principal: el territorio con todas sus vistas y la ficha de cada circuito.</td></tr>
@@ -134,7 +92,7 @@
     <tr><td>Usuarios</td><td>Alta y baja de administradores. Solo la ve el superadmin.</td></tr>
   </table>
 
-  <h2><span class="paso">3</span> La barra de controles del mapa</h2>
+  <h2>La barra de controles del mapa</h2>
   <figure>
     <img src="img/03-controles.jpg" alt="Barra de controles del mapa con vistas, capas y buscador">
     <figcaption>
@@ -142,23 +100,14 @@
       <b>Segunda fila:</b> los indicadores del operativo y, según la vista, sus filtros.
     </figcaption>
   </figure>
-
-  <table>
+  <table style="margin-bottom:0">
     <tr><td>Vistas</td><td>Cambian <b>qué pinta el mapa</b>. Se explican en las dos páginas siguientes.</td></tr>
-    <tr><td>Distritos / Circuitos</td><td>Qué división se dibuja. El padrón y los resultados se organizan por <b>circuito</b>, así que en las vistas de datos «Distritos» queda deshabilitado.</td></tr>
-    <tr><td>Capas</td><td>Seis interruptores: <span class="pildora gris">3D</span> levanta cada espacio según la métrica de la vista · <span class="pildora gris">Cobertura</span> pinta el estado de asignación · <span class="pildora gris">Avenidas</span> y <span class="pildora gris">Calles</span> realzan el callejero · <span class="pildora gris">Barrios</span> dibuja los 327 barrios oficiales · <span class="pildora gris">Satélite</span> pone la foto real debajo.</td></tr>
-    <tr><td>Buscador</td><td>Tres formas de usarlo. Escribir un <b>circuito o distrito</b> («15B») y te lleva. Escribir el nombre de una <b>escuela</b> o de una <b>persona del padrón</b>. O pedirlo en lenguaje natural con el botón de la chispa: «mujeres de 16 a 25», «escuelas con más de 5.000 electores». El micrófono hace lo mismo dictando.</td></tr>
-    <tr><td>Indicadores</td><td>Electores del padrón; distritos y circuitos <b>con al menos una persona asignada</b> (sobre 20 y 47); personas con espacio; y tareas cumplidas sobre el total del checklist.</td></tr>
+    <tr><td>Distritos / Circuitos</td><td>Qué división se dibuja. Los datos electorales se organizan por <b>circuito</b>, así que en esas vistas «Distritos» queda deshabilitado.</td></tr>
+    <tr><td>Capas</td><td><span class="pildora gris">3D</span> levanta cada espacio según la métrica de la vista · <span class="pildora gris">Cobertura</span> pinta el estado de asignación · <span class="pildora gris">Avenidas</span> y <span class="pildora gris">Calles</span> realzan el callejero · <span class="pildora gris">Barrios</span> dibuja los 327 barrios · <span class="pildora gris">Satélite</span> pone la foto real debajo.</td></tr>
+    <tr><td>Buscador</td><td>Un <b>circuito</b> («15B») y te lleva; el nombre de una <b>escuela</b> o de una <b>persona del padrón</b>; o lenguaje natural con el botón de la chispa («mujeres de 16 a 25»). El micrófono hace lo mismo dictando.</td></tr>
+    <tr><td>Indicadores</td><td>Electores; distritos y circuitos <b>con al menos una persona asignada</b> (sobre 20 y 47); personas con espacio; y tareas cumplidas sobre el total.</td></tr>
+    <tr><td>Navegación</td><td>Arrastrar mueve, la rueda acerca. <b>Un clic en un circuito abre su ficha</b> y lo encuadra; al pasar el cursor aparece un resumen. La leyenda, abajo a la izquierda, se cierra con la X.</td></tr>
   </table>
-
-  <div class="nota">
-    <div class="titulo">Cómo se navega</div>
-    <p>
-      Arrastrás para mover y la rueda del mouse acerca o aleja. <b>Un clic en cualquier circuito abre su ficha</b>
-      y lo encuadra; al pasar el cursor por encima aparece un resumen con todo lo que ya está cargado, sin importar
-      en qué vista estés. La leyenda vive abajo a la izquierda: se cierra con la X y vuelve con el botón «Leyenda».
-    </p>
-  </div>
 
   <div class="pie"><span>JxR · Comando Territorial · documento interno de campaña</span><span class="num">2</span></div>
 </section>
@@ -404,6 +353,15 @@
       <img class="tope-88-abajo" src="img/10-mesas-peleadas.jpg" alt="Tabla de mesas mas peleadas del circuito">
       <figcaption>La tabla mesa por mesa de 2025, con las diferencias más chicas arriba.</figcaption>
     </figure>
+  </div>
+
+  <div class="nota cuidado">
+    <div class="titulo">Un límite que conviene tener presente</div>
+    <p>
+      Las mesas de la elección nacional 2025 <b>no llevan la misma numeración</b> que las del padrón provincial.
+      Por eso el 2025 se analiza por mesa y por circuito, sin bajar a escuela, y la comparación entre 2023 y 2025
+      se hace <b>por circuito</b>, donde los 47 códigos sí coinciden.
+    </p>
   </div>
 
   <div class="nota" style="margin-top:3mm">
