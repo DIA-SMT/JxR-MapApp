@@ -10,7 +10,7 @@ const SECCIONES = [
   { href: "/personas", etiqueta: "Personas", icono: Users },
   { href: "/estrategia", etiqueta: "Estrategia", icono: Goal },
   { href: "/segmentos", etiqueta: "Segmentos", icono: SlidersHorizontal },
-  { href: "/bunker", etiqueta: "Búnker", icono: Activity },
+  { href: "/dia-d", etiqueta: "DÍA D", icono: Activity },
 ] as const;
 
 /**

@@ -259,3 +259,15 @@ figure img.tope-45 { max-height: 45mm; object-fit: cover; object-position: top; 
   display: flex;
   justify-content: space-between;
 }
+figure img.tope-60 { max-height: 60mm; object-fit: cover; object-position: top; }
+figure img.tope-62 { max-height: 62mm; object-fit: cover; object-position: top; }
+figure img.tope-58 { max-height: 58mm; object-fit: cover; object-position: top; }
+figure img.tope-52 { max-height: 52mm; object-fit: cover; object-position: top; }
+figure img.tope-55 { max-height: 55mm; object-fit: cover; object-position: top; }
+
+/* Hojas del DÍA D: densas por naturaleza (cinco pantallas en dos carillas) */
+.hoja.densa p { font-size: 7.6pt; line-height: 1.36; margin-bottom: 1.6mm; }
+.hoja.densa li { font-size: 7.6pt; }
+.hoja.densa td { font-size: 7.3pt; padding: 0.9mm 2mm 0.9mm 0; }
+.hoja.densa h2 { font-size: 11pt; margin-bottom: 2mm; }
+.hoja.densa figure { margin-bottom: 2mm; }

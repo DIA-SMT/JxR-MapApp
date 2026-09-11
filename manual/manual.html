@@ -37,7 +37,8 @@
     <div><b>4</b> Oportunidad, 2023↔2025 y Prioridad</div>
     <div><b>8</b> Estrategia y reparto de bancas</div>
     <div><b>5</b> La ficha del circuito</div>
-    <div><b>9</b> Búnker y uso en el teléfono</div>
+    <div><b>9</b> DÍA D: fiscales, participación e incidencias</div>
+    <div><b>10</b> DÍA D: escrutinio, configuración y teléfono</div>
   </div>
 
   <div class="creditos">
@@ -597,82 +598,149 @@
   <div class="pie"><span>JxR · Comando Territorial · documento interno de campaña</span><span class="num">8</span></div>
 </section>
 
-<!-- ══════════════════════ 9 · BÚNKER Y TELÉFONO ══════════════════════ -->
-<section class="hoja">
+<!-- ══════════════════════ 9 · DÍA D ══════════════════════ -->
+<section class="hoja densa">
   <div class="cabecera">
     <div class="marca">
       <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="62" height="62" rx="16" fill="#E14F82"/><text x="11" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">J</text><text x="38" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">R</text><text x="24" y="41" font-family="Poppins,sans-serif" font-weight="800" font-size="21" fill="#14213D" transform="rotate(-8 32 32)">x</text><path d="M13 51 Q32 59 51 49" stroke="#14213D" stroke-width="4.5" stroke-linecap="round" fill="none"/></svg>
       <div class="nombre"><small>Comando</small><b>Territorial</b></div>
     </div>
-    <div class="seccion">Búnker y uso en el teléfono</div>
+    <div class="seccion">DÍA D · fiscales y jornada</div>
   </div>
 
-  <h2>Búnker — el escrutinio propio, en vivo</h2>
+  <h2>DÍA D — el comando de la jornada electoral</h2>
   <p>
-    La noche de la elección, cada fiscal carga el telegrama de su mesa desde el teléfono y el tablero proyecta
-    resultados y bancas mesa a mesa, <b>horas antes de los datos oficiales</b>.
+    Cinco pestañas: quién está en cada mesa y cómo contactarlo, cuánta gente votó a cada hora, los problemas que van
+    apareciendo, el escrutinio propio y la configuración. La barra de arriba resume la jornada —mesas con fiscal,
+    fiscales ausentes, incidencias abiertas— y deja el teléfono del comando a un clic.
   </p>
 
-  <div class="fila">
-    <div style="flex:1">
-      <h3 style="margin-top:0">Antes: configurar y abrir</h3>
-      <p>
-        Con el búnker cerrado se define el <b>nombre de la elección</b>, la categoría, las <b>bancas en juego</b>,
-        las <b>mesas esperadas</b> (1.350 en Capital) y las <b>listas que compiten</b>, una por línea y escritas
-        como van a figurar en el telegrama. Después, <b>Abrir el búnker</b>.
-      </p>
-      <h3>Durante: cargar mesas</h3>
-      <p>
-        Número de mesa, circuito, electores (opcional) y los votos de cada lista, más blancos y nulos. El total lo
-        calcula el sistema. Si una mesa <b>ya estaba cargada, se reemplaza</b>: así se corrigen errores sin
-        duplicar. Cada carga confirma con «Mesa N cargada ✓».
-      </p>
-    </div>
-    <div style="flex:1">
-      <h3 style="margin-top:0">El tablero</h3>
-      <p>
-        Mesas escrutadas y porcentaje de avance, votantes, blancos y nulos; el <b>resultado en vivo con las bancas
-        proyectadas</b> por D&rsquo;Hondt; el puntero de cada circuito; y las últimas mesas cargadas. Se refresca
-        solo cada 15 segundos.
-      </p>
-      <h3>Al terminar</h3>
-      <p>
-        El superadmin puede <b>cerrar</b> el búnker —deja de recibir cargas y los datos quedan— y <b>reiniciar</b>,
-        que borra todas las mesas para arrancar otra elección. Reiniciar pide confirmación y no se puede deshacer.
-      </p>
-    </div>
-  </div>
+  <h2><span class="paso">1</span> Fiscales — quién está en cada mesa</h2>
   <figure>
-    <img class="tope-45" src="img/21-bunker-vivo.jpg" alt="Tablero del bunker en vivo con bancas proyectadas">
+    <img class="tope-52" src="img/26-diad-fiscales.jpg" alt="Fiscales por mesa con contacto en un clic">
     <figcaption>
-      El tablero con tres mesas cargadas: ya proyecta el reparto de las 18 bancas, el puntero de cada circuito y
-      las últimas cargas.
+      Las mesas se agrupan por escuela y <b>las que tienen más mesas descubiertas van primero</b>. El buscador toma
+      mesa, escuela, circuito, nombre o teléfono, y los filtros <b>Sin fiscal</b> y <b>Ausentes</b> dejan solo lo que falta.
     </figcaption>
   </figure>
+  <table>
+    <tr><td>Contacto</td><td>Los dos botones de cada fila <b>llaman</b> o abren <b>WhatsApp</b> con el mensaje ya escrito, diciendo de qué mesa y escuela se trata. El teléfono se puede anotar como venga («0381 15 512-3456»): el sistema lo normaliza.</td></tr>
+    <tr><td>Estado</td><td>Se cambia con un clic y es lo que más se toca en la jornada: <span class="pildora gris">Asignado</span> anotado · <span class="pildora gris">Confirmó</span> avisó que va · <span class="pildora gris">Presente</span> está en la escuela · <span class="pildora gris">Ausente</span> no llegó y hay que reemplazarlo.</td></tr>
+    <tr><td>Asignar</td><td>Se elige una <b>persona del operativo</b> —y trae su nombre y teléfono— o se escriben sueltos, para anotar gente rápido sin crear la ficha completa. Cada mesa admite un rol propio (fiscal de mesa, fiscal general) y una nota.</td></tr>
+  </table>
 
-  <h2 style="margin-top:3mm">En el teléfono</h2>
+  <h2 style="margin-top:4mm"><span class="paso">2</span> Participación — dónde traccionar, mientras se vota</h2>
   <div class="fila">
-    <figure style="flex:1;margin-bottom:0"><img class="tope-70" src="img/23-mobile-menu.jpg" alt="Menu en el telefono"><figcaption>Las secciones pasan a un menú desplegable.</figcaption></figure>
-    <figure style="flex:1;margin-bottom:0"><img class="tope-70" src="img/24-mobile-hoja.jpg" alt="Ficha del circuito en el telefono"><figcaption>La ficha se abre como hoja inferior y deja ver el mapa.</figcaption></figure>
-    <figure style="flex:1;margin-bottom:0"><img class="tope-70" src="img/25-mobile-bunker.jpg" alt="Carga de mesa en el telefono"><figcaption>La carga del búnker, pensada para el fiscal.</figcaption></figure>
+    <div style="flex:1">
+      <p>
+        El fiscal reporta cuánta gente votó en su mesa a cada <b>corte horario</b>. El tablero compara los circuitos
+        entre sí y marca los que van por debajo del promedio con un <b>«← traccionar»</b>: ahí hay que mandar gente a
+        buscar votantes, y hay que saberlo a las 14, no a las 19.
+      </p>
+      <p class="chico" style="margin-bottom:0">
+        El porcentaje sale solo de las mesas que reportaron: es una muestra para comparar circuitos. El sistema
+        rechaza cargar más votantes que electores tiene la mesa.
+      </p>
+    </div>
+    <figure style="flex:1.25;margin-bottom:0">
+      <img class="tope-52" src="img/27-diad-participacion.jpg" alt="Participación por corte horario">
+    </figure>
+  </div>
+
+  <h2 style="margin-top:4mm"><span class="paso">3</span> Incidencias — los problemas, y quién los resuelve</h2>
+  <div class="fila">
+    <figure style="flex:1.25;margin-bottom:0">
+      <img class="tope-52" src="img/28-diad-incidencias.jpg" alt="Incidencias de la jornada">
+    </figure>
+    <div style="flex:1">
+      <p>
+        Se reporta con la mesa (o la escuela entera), el tipo —faltan boletas, urna sin faja, la mesa no abrió,
+        aprietes, traslado de votantes…—, la <b>gravedad</b> y qué hace falta. La escuela y el circuito los completa
+        el sistema a partir del número de mesa.
+      </p>
+      <p style="margin-bottom:0">
+        Las <b>graves van primero</b> y el contador aparece en la pestaña. Un clic la cierra, y se puede reabrir.
+      </p>
+    </div>
+  </div>
+
+  <div class="pie"><span>JxR · Comando Territorial · documento interno de campaña</span><span class="num">9</span></div>
+</section>
+
+<!-- ══════════════════════ 10 · ESCRUTINIO, CONFIG Y TELÉFONO ══════════════════════ -->
+<section class="hoja densa">
+  <div class="cabecera">
+    <div class="marca">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="62" height="62" rx="16" fill="#E14F82"/><text x="11" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">J</text><text x="38" y="43" font-family="Poppins,sans-serif" font-weight="800" font-size="30" fill="#fff">R</text><text x="24" y="41" font-family="Poppins,sans-serif" font-weight="800" font-size="21" fill="#14213D" transform="rotate(-8 32 32)">x</text><path d="M13 51 Q32 59 51 49" stroke="#14213D" stroke-width="4.5" stroke-linecap="round" fill="none"/></svg>
+      <div class="nombre"><small>Comando</small><b>Territorial</b></div>
+    </div>
+    <div class="seccion">DÍA D · escrutinio, configuración y teléfono</div>
+  </div>
+
+  <h2><span class="paso">4</span> Escrutinio — el conteo propio, en vivo</h2>
+  <div class="fila">
+    <div style="flex:1">
+      <p>
+        Se carga el telegrama: <b>número de mesa</b> y los votos de cada lista, más blancos y nulos. La escuela, el
+        circuito y el padrón <b>salen solos del número de mesa</b>, y el total se calcula y se controla contra el
+        padrón: si los votos superan a los electores, no deja cargar.
+      </p>
+      <p>
+        El tablero proyecta el resultado y <b>las bancas por D&rsquo;Hondt</b> mesa a mesa, con el puntero de cada
+        circuito y las últimas cargas. Se refresca solo cada 15 segundos mientras la jornada está abierta.
+      </p>
+      <p class="chico" style="margin-bottom:0">
+        Re-cargar una mesa reemplaza el valor: así se corrigen errores sin duplicar.
+      </p>
+    </div>
+    <figure style="flex:1.2;margin-bottom:0">
+      <img class="tope-55" src="img/30-diad-escrutinio.jpg" alt="Escrutinio en vivo con bancas proyectadas">
+    </figure>
+  </div>
+
+  <h2 style="margin-top:4mm"><span class="paso">5</span> Configuración — lo que carga el administrador</h2>
+  <div class="fila">
+    <figure style="flex:1;margin-bottom:0">
+      <img class="tope-55" src="img/29-diad-config.jpg" alt="Parámetros de la jornada">
+    </figure>
+    <div style="flex:1.05">
+      <p>Todo lo que cambia de una elección a otra se define acá, y el resto de las pestañas trabaja con esos valores.</p>
+      <table style="margin-bottom:1.5mm">
+        <tr><td>Elección</td><td>Nombre, fecha y horarios de apertura y cierre.</td></tr>
+        <tr><td>Cargo</td><td>Categoría y <b>bancas en juego</b> (18 concejales, 19 legisladores por la Sección Capital).</td></tr>
+        <tr><td>Mesas</td><td>Cuántas se esperan, para calcular el avance del escrutinio.</td></tr>
+        <tr><td>Meta</td><td>Los votos propios que se buscan; aparece en el tablero.</td></tr>
+        <tr><td>Comando</td><td>El teléfono central, que queda a un clic en todas las pantallas.</td></tr>
+        <tr><td>Cortes</td><td>Las horas en que los fiscales reportan participación.</td></tr>
+        <tr><td>Listas</td><td>Las que compiten, una por línea. Conviene ponerlas <b>en el mismo orden del acta</b>: es el orden en que se cargan los votos.</td></tr>
+      </table>
+      <p class="chico" style="margin-bottom:0">
+        Con la jornada cerrada el tablero deja de refrescarse, pero los datos quedan.
+      </p>
+    </div>
+  </div>
+
+  <h2 style="margin-top:4mm">En el teléfono</h2>
+  <div class="fila">
+    <figure style="flex:1;margin-bottom:0"><img class="tope-58" src="img/31-diad-mobile.jpg" alt="DÍA D en el teléfono"><figcaption>El DÍA D, que es lo que usa el fiscal.</figcaption></figure>
+    <figure style="flex:1;margin-bottom:0"><img class="tope-58" src="img/23-mobile-menu.jpg" alt="Menú en el teléfono"><figcaption>Las secciones, en un menú desplegable.</figcaption></figure>
+    <figure style="flex:1;margin-bottom:0"><img class="tope-58" src="img/24-mobile-hoja.jpg" alt="Ficha del circuito en el teléfono"><figcaption>La ficha del circuito, como hoja inferior.</figcaption></figure>
   </div>
   <p style="margin-top:2mm">
-    Todo el sistema funciona en el teléfono. Las vistas del mapa se deslizan con el dedo, las capas se agrupan
-    detrás del botón <b>Capas</b> (con el número de activas), la leyenda arranca cerrada para no tapar el mapa y
-    las tablas anchas se deslizan de costado.
+    Todo funciona en el teléfono, que el día de la elección es el único dispositivo que importa: las vistas del mapa
+    se deslizan con el dedo y las tablas anchas, de costado.
   </p>
 
   <div class="nota cuidado" style="margin-bottom:0">
     <div class="titulo">Tres reglas de uso</div>
     <p>
-      <b>1.</b> El voto es secreto: el análisis político es siempre agregado por escuela, circuito o cohorte, nunca
-      sobre una persona. &nbsp;<b>2.</b> Los datos de contacto del padrón y de las personas del operativo se usan
-      para logística y organización, y no se comparten fuera del equipo (Ley 25.326). &nbsp;<b>3.</b> Los
-      resultados 2025 son <b>provisorios</b>: cuando se cite un número de 2025 conviene aclararlo.
+      <b>1.</b> El voto es secreto: el análisis es siempre agregado, nunca sobre una persona. &nbsp;<b>2.</b> Los
+      datos de contacto se usan para logística del equipo y no se comparten fuera (Ley 25.326). &nbsp;<b>3.</b> El
+      escrutinio del DÍA D es una <b>proyección propia</b>: no reemplaza al oficial.
     </p>
   </div>
 
-  <div class="pie"><span>JxR · Comando Territorial · documento interno de campaña</span><span class="num">9</span></div>
+  <div class="pie"><span>JxR · Comando Territorial · documento interno de campaña</span><span class="num">10</span></div>
 </section>
 
 </body>

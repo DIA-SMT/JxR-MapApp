@@ -18,8 +18,12 @@ const RECORTE = {
   "20-bunker-config": 0.62,
   "21-bunker-vivo": 0.44,
   "18-segmentos": 0.78,
+  "26-diad-fiscales": 0.56,
+  "27-diad-participacion": 0.82,
+  "28-diad-incidencias": 0.8,
+  "30-diad-escrutinio": 0.95,
 };
-const ANCHO = { "03-controles": 1600, "09-panel-circuito": 620, "10-mesas-peleadas": 620, "11-plan-territorial": 620, "12-elena-chat": 640, "23-mobile-menu": 430, "24-mobile-hoja": 430, "25-mobile-bunker": 430 };
+const ANCHO = { "03-controles": 1600, "09-panel-circuito": 620, "10-mesas-peleadas": 620, "11-plan-territorial": 620, "12-elena-chat": 640, "23-mobile-menu": 430, "24-mobile-hoja": 430, "25-mobile-bunker": 430, "31-diad-mobile": 430 };
 
 const navegador = await puppeteer.launch({
   executablePath: CHROME,
