@@ -11,7 +11,9 @@ export function descargarCSV(
   const celda = (v: string | number | boolean | null | undefined) => {
     if (v == null) return "";
     if (typeof v === "boolean") return v ? "sí" : "no";
-    const s = String(v);
+    // Un texto que empieza con = + - @ Excel lo ejecuta como fórmula: se le
+    // antepone un apóstrofo. Los números no, que un negativo es un número.
+    const s = typeof v === "string" && /^[=+\-@\t\r]/.test(v) ? `'${v}` : String(v);
     return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const texto = [encabezados, ...filas].map((f) => f.map(celda).join(";")).join("\r\n");

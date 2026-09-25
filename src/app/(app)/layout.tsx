@@ -16,6 +16,9 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   if (!sesion) redirect("/acceso");
   const { perfil } = sesion;
   if (perfil.debe_cambiar_password) redirect("/cambiar-password");
+  const esSuperadmin = perfil.rol === "superadmin";
+  // Presupuesto no es para cualquier usuario del comando: solo superadmin y habilitados.
+  const { data: habilitado } = esSuperadmin ? { data: true } : await sesion.supabase.rpc("puede_presupuesto");
 
   return (
     <div className="flex h-screen flex-col">
@@ -24,7 +27,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           <Link href="/" className="shrink-0">
             <LogoJxR />
           </Link>
-          <NavApp esSuperadmin={perfil.rol === "superadmin"} />
+          <NavApp esSuperadmin={esSuperadmin} puedePresupuesto={habilitado === true} />
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {/* El nombre no cabe en pantallas chicas y no es información crítica */}
