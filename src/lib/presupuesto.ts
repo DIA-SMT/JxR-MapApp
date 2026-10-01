@@ -153,6 +153,38 @@ export type BaseIndicador = "hogares" | "poblacion" | "activos";
  * de materiales: están en el ZIP del INDEC pero no se cargaron; hasta que se
  * carguen, una política que las necesite queda sin indicador.
  */
+const SIN_PLURAL = new Set(["de", "del", "en", "con", "sin", "a", "para", "por", "y"]);
+const SIN_TILDE: Record<string, string> = { á: "a", é: "e", í: "i", ó: "o", ú: "u" };
+
+/**
+ * La unidad de una política en plural ("persona mayor" → "personas mayores",
+ * "conexión" → "conexiones"), para escribir "418 hogares" y no "418 hogar".
+ * Solo se pluralizan las palabras hasta la primera preposición: "cupo en
+ * taller" → "cupos en taller".
+ */
+export function plural(unidad: string, n = 2): string {
+  const u = unidad.trim();
+  if (!u) return n === 1 ? "unidad" : "unidades";
+  if (n === 1) return u;
+  const palabras = u.split(/\s+/);
+  let corte = palabras.findIndex((p) => SIN_PLURAL.has(p.toLowerCase()));
+  if (corte < 0) corte = palabras.length;
+  return palabras
+    .map((p, i) => {
+      if (i >= corte || /\d/.test(p) || /[sx]$/i.test(p)) return p;
+      if (/[aeiouáéó]$/i.test(p)) return p + "s";
+      if (/z$/i.test(p)) return p.slice(0, -1) + "ces";
+      return p.replace(/([áéíóú])([nsl])$/, (_, v: string, c: string) => SIN_TILDE[v] + c) + "es";
+    })
+    .join(" ");
+}
+
+/** Un porcentaje con coma decimal, como se escribe acá: 22,4%. */
+export function pct(x: number, decimales = 1): string {
+  const v = Number.isFinite(x) ? x : 0;
+  return `${v.toLocaleString("es-AR", { minimumFractionDigits: decimales, maximumFractionDigits: decimales })}%`;
+}
+
 export const INDICADORES: Record<string, { etiqueta: string; unidad: string; base: BaseIndicador }> = {
   nbi: { etiqueta: "Hogares con NBI", unidad: "hogares", base: "hogares" },
   privacion: { etiqueta: "Hogares con privación (IPMH)", unidad: "hogares", base: "hogares" },
@@ -160,13 +192,13 @@ export const INDICADORES: Record<string, { etiqueta: string; unidad: string; bas
   clima_educativo_bajo: { etiqueta: "Hogares con clima educativo bajo", unidad: "hogares", base: "hogares" },
   sin_cloaca: { etiqueta: "Hogares sin cloaca", unidad: "hogares", base: "hogares" },
   sin_agua_red: { etiqueta: "Hogares sin agua de red", unidad: "hogares", base: "hogares" },
-  hogares: { etiqueta: "Hogares (todos)", unidad: "hogares", base: "hogares" },
+  hogares: { etiqueta: "Todos los hogares", unidad: "hogares", base: "hogares" },
   desocupados: { etiqueta: "Personas desocupadas", unidad: "personas", base: "activos" },
   sin_cobertura_salud: { etiqueta: "Personas sin cobertura de salud", unidad: "personas", base: "poblacion" },
   poblacion_0_14: { etiqueta: "Niñas y niños de 0 a 14", unidad: "personas", base: "poblacion" },
   poblacion_15_64: { etiqueta: "Personas de 15 a 64", unidad: "personas", base: "poblacion" },
   poblacion_65_mas: { etiqueta: "Personas de 65 y más", unidad: "personas", base: "poblacion" },
-  poblacion: { etiqueta: "Población (toda)", unidad: "personas", base: "poblacion" },
+  poblacion: { etiqueta: "Toda la población", unidad: "personas", base: "poblacion" },
 };
 
 /** Base de un barrio para medir la intensidad de un indicador. */

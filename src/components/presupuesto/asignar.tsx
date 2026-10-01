@@ -1,13 +1,32 @@
 "use client";
 
-import { Download, Info, Lock, LockOpen, Save, Scale, Search, TriangleAlert, X } from "lucide-react";
-import { useDeferredValue, useMemo, useState } from "react";
+import {
+  Download,
+  FlaskConical,
+  Info,
+  Lock,
+  LockOpen,
+  Save,
+  Scale,
+  Search,
+  SlidersHorizontal,
+  TriangleAlert,
+  X,
+} from "lucide-react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { asignarPresupuesto, type ResultadoAsignacion } from "@/lib/asignacion";
-import { armarEntradas, INDICADORES, libreAsignable, parsearImporte, type Partida } from "@/lib/presupuesto";
+import {
+  armarEntradas,
+  INDICADORES,
+  libreAsignable,
+  parsearImporte,
+  pct,
+  plural,
+  type Partida,
+} from "@/lib/presupuesto";
 import { guardarEscenario, type Ajuste } from "@/lib/presupuesto-datos";
 import { descargarCSV } from "@/lib/csv";
-import { Cifra, Cifras } from "@/components/ui/cifras";
 import { Vacio } from "@/components/ui/vacio";
 import { MapaBarrios } from "./mapa-barrios";
 import type { DatosPresupuesto } from "./panel";
@@ -32,16 +51,50 @@ const TIPO: Record<string, string> = {
 
 type Vista = "total" | "hogar";
 
+/**
+ * Los tres criterios que se ofrecen, en lenguaje llano. Cada uno es una
+ * combinación de los dos parámetros del motor: cuánto pesa que la necesidad
+ * esté concentrada (intensidad) y cuánto se reparte entre barrios (equidad).
+ */
+const CRITERIOS = [
+  {
+    clave: "necesidad",
+    titulo: "Donde más se necesita",
+    texto: "Concentra la plata en los barrios con más necesidad que el promedio de la ciudad.",
+    intensidad: 2,
+    equidad: 0.5,
+  },
+  {
+    clave: "equilibrado",
+    titulo: "Equilibrado",
+    texto: "Prioriza la necesidad, pero sin dejar afuera a los barrios con necesidad media.",
+    intensidad: 1,
+    equidad: 1,
+  },
+  {
+    clave: "alcance",
+    titulo: "Llegar a más barrios",
+    texto: "Reparte para que la mayor cantidad de barrios reciba algo, aunque sea menos.",
+    intensidad: 0.5,
+    equidad: 3,
+  },
+] as const;
+
 export function Asignar({
   supabase,
   datos,
+  ejemplo = false,
   onGuardado,
   irA,
+  onEjemplo,
 }: {
   supabase: SupabaseClient;
   datos: DatosPresupuesto;
+  /** Modo ejemplo: montos inventados, no se guarda. */
+  ejemplo?: boolean;
   onGuardado: () => Promise<void> | void;
   irA: (s: "disponible" | "politicas" | "escenarios") => void;
+  onEjemplo?: () => void;
 }) {
   const [intensidad, setIntensidad] = useState(1);
   const [equidad, setEquidad] = useState(1);
@@ -50,6 +103,11 @@ export function Asignar({
   // por qué se tocó cada celda: quien aprueba ve cada desvío del criterio
   const [motivos, setMotivos] = useState<Record<string, string>>({});
   const [barrio, setBarrio] = useState<string | null>(null);
+  // En pantallas angostas el detalle queda debajo del mapa: al elegir un barrio, se lo trae a la vista.
+  const detalleRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (barrio && window.innerWidth < 1024) detalleRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [barrio]);
   const [vista, setVista] = useState<Vista>("total");
   const [busqueda, setBusqueda] = useState("");
   const [nombre, setNombre] = useState("");
@@ -64,7 +122,12 @@ export function Asignar({
 
   // El motor trabaja sobre lo LIBRE: lo que ya reservan los escenarios aprobados no se vuelve a repartir.
   const partidasLibres = useMemo<Partida[]>(
-    () => datos.partidas.map((p) => ({ ...p, credito_vigente: p.libre, comprometido: 0 })),
+    () =>
+      datos.partidas.map((p) => ({
+        ...p,
+        credito_vigente: p.libre,
+        comprometido: 0,
+      })),
     [datos.partidas],
   );
 
@@ -97,7 +160,10 @@ export function Asignar({
 
   // Un fijo cuya celda salió del juego (se sacó la política, perdió el costo o
   // sus partidas) no se guarda ni pide motivo: se muestra aparte para soltarlo.
-  const clavesEnJuego = useMemo(() => new Set(entradas.necesidades.map((n) => `${n.politica}|${n.destino}`)), [entradas]);
+  const clavesEnJuego = useMemo(
+    () => new Set(entradas.necesidades.map((n) => `${n.politica}|${n.destino}`)),
+    [entradas],
+  );
   const fijosVigentes = Object.keys(fijos).filter((k) => clavesEnJuego.has(k));
   const fijosHuerfanos = Object.keys(fijos).filter((k) => !clavesEnJuego.has(k));
   const soltar = (claves: string[]) => {
@@ -121,7 +187,10 @@ export function Asignar({
       fijos: {},
       politicas: diferidos.politicas.length ? diferidos.politicas : [-1],
     });
-    const base = asignarPresupuesto(e.fuentes, e.politicas, e.necesidades, { equidad: diferidos.equidad, pasos: 4000 });
+    const base = asignarPresupuesto(e.fuentes, e.politicas, e.necesidades, {
+      equidad: diferidos.equidad,
+      pasos: 4000,
+    });
     return new Map(base.asignaciones.map((a) => [`${a.politica}|${a.destino}`, a.monto]));
   }, [partidasLibres, datos.politicas, datos.barrios, diferidos]);
 
@@ -155,12 +224,13 @@ export function Asignar({
     return out;
   }, [porBarrio, vista, barrioPorId]);
 
+  const filasBarrioTodas = useMemo(
+    () => [...porBarrio.entries()].map(([id, x]) => ({ id, monto: x.monto })).sort((a, b) => b.monto - a.monto),
+    [porBarrio],
+  );
+
   const filasBarrio = useMemo(() => {
-    const q = busqueda
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .toLowerCase()
-      .trim();
+    const q = busqueda.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
     return [...porBarrio.entries()]
       .map(([id, x]) => {
         const b = barrioPorId.get(id);
@@ -176,11 +246,17 @@ export function Asignar({
       .sort((a, b) => b.monto - a.monto);
   }, [porBarrio, barrioPorId, busqueda]);
 
+  const politicasConPlata = r.porPolitica.filter((p) => p.monto > 0);
+  const topBarrios = filasBarrioTodas.slice(0, 3);
+
   const financiadoPor = useMemo(() => {
     const m = new Map<string, Array<{ partida: string; monto: number }>>();
     for (const f of r.financiamiento) {
       const l = m.get(f.politica) ?? [];
-      l.push({ partida: partidaPorId.get(f.fuente)?.codigo ?? f.fuente, monto: f.monto });
+      l.push({
+        partida: partidaPorId.get(f.fuente)?.codigo ?? f.fuente,
+        monto: f.monto,
+      });
       m.set(f.politica, l);
     }
     return m;
@@ -210,9 +286,12 @@ export function Asignar({
   const guardar = async () => {
     if (guardando) return;
     setMensaje(null);
-    if (!nombre.trim()) return setMensaje({ ok: false, texto: "Poné un nombre al escenario." });
+    if (!nombre.trim()) return setMensaje({ ok: false, texto: "Poné un nombre a la propuesta." });
     if (criterio.trim().length < 20)
-      return setMensaje({ ok: false, texto: "Explicá el criterio (al menos 20 caracteres): es el fundamento del acto." });
+      return setMensaje({
+        ok: false,
+        texto: "Explicá el criterio (al menos 20 caracteres): es el fundamento del acto.",
+      });
     const sinMotivo = fijosVigentes.filter((k) => (motivos[k] ?? "").trim().length < 5);
     if (sinMotivo.length > 0) {
       return setMensaje({
@@ -223,7 +302,13 @@ export function Asignar({
     const ajustes: Ajuste[] = fijosVigentes.map((k) => {
       const [politica, barrio] = k.split("|");
       const efectivo = r.fijados.find((x) => x.politica === politica && x.destino === barrio)?.efectivo ?? 0;
-      return { politica, barrio, montoMotor: sinAjustes?.get(k) ?? 0, montoFijado: efectivo, motivo: motivos[k].trim() };
+      return {
+        politica,
+        barrio,
+        montoMotor: sinAjustes?.get(k) ?? 0,
+        montoFijado: efectivo,
+        motivo: motivos[k].trim(),
+      };
     });
     setGuardando(true);
     const { error } = await guardarEscenario(supabase, {
@@ -242,26 +327,41 @@ export function Asignar({
     });
     setGuardando(false);
     if (error) return setMensaje({ ok: false, texto: error });
-    setMensaje({ ok: true, texto: "Escenario guardado como borrador." });
+    setMensaje({ ok: true, texto: "Propuesta guardada como borrador." });
     setNombre("");
     setCriterio("");
     await onGuardado();
   };
 
-  // ── estados vacíos ──
-  if (datos.partidas.length === 0)
+  // ── estados vacíos: dicen qué falta y ofrecen probar el ejemplo ──
+  const botonEjemplo = onEjemplo && (
+    <button
+      onClick={onEjemplo}
+      className="flex items-center gap-1.5 rounded-lg border border-rosa/40 px-3 py-1.5 text-xs font-bold text-rosa"
+    >
+      <FlaskConical size={13} /> Probar con un ejemplo
+    </button>
+  );
+  if (libreTotal <= 0)
     return (
       <Vacio
         icono={Scale}
-        titulo="Todavía no hay partidas cargadas"
+        titulo="Primero hace falta saber cuánta plata hay"
         accion={
-          <button onClick={() => irA("disponible")} className="rounded-lg bg-rosa px-3 py-1.5 text-xs font-bold text-white">
-            Cargar partidas
-          </button>
+          <div className="flex flex-wrap justify-center gap-2">
+            <button
+              onClick={() => irA("disponible")}
+              className="rounded-lg bg-rosa px-3 py-1.5 text-xs font-bold text-white"
+            >
+              Ir al paso 1 · Plata disponible
+            </button>
+            {botonEjemplo}
+          </div>
         }
       >
-        Para asignar hace falta saber cuánto queda libre en cada partida. Se carga desde el reporte de ejecución de la
-        Contaduría: la ordenanza del presupuesto no trae ese detalle.
+        Para repartir, la herramienta necesita la plata que queda libre en el presupuesto. Se carga en el paso 1: con el
+        reporte de la Contaduría, o con una estimación rápida por tipo de gasto. Mientras tanto podés ver cómo funciona
+        con un ejemplo de montos inventados.
       </Vacio>
     );
 
@@ -270,74 +370,112 @@ export function Asignar({
     return (
       <Vacio
         icono={Scale}
-        titulo="Ninguna política tiene costo por unidad"
+        titulo="Falta el costo de las políticas"
         accion={
-          <button onClick={() => irA("politicas")} className="rounded-lg bg-rosa px-3 py-1.5 text-xs font-bold text-white">
-            Completar costos
-          </button>
+          <div className="flex flex-wrap justify-center gap-2">
+            <button
+              onClick={() => irA("politicas")}
+              className="rounded-lg bg-rosa px-3 py-1.5 text-xs font-bold text-white"
+            >
+              Ir al paso 2 · Políticas y costos
+            </button>
+            {botonEjemplo}
+          </div>
         }
       >
-        El motor necesita saber cuánto cuesta cada unidad (una conexión, un cupo, una luminaria) para convertir pesos en
-        necesidad cubierta. Hay {candidatas.length} políticas activas esperando su costo.
+        Para convertir pesos en obras o cupos, la herramienta necesita saber cuánto cuesta cada unidad (una cuadra, una
+        conexión, un cupo). Hay {candidatas.length} políticas esperando su costo en el paso 2.
       </Vacio>
     );
 
   const seleccion = barrio ? barrioPorId.get(barrio) : null;
   const asignacionesBarrio = barrio ? r.asignaciones.filter((a) => a.destino === barrio) : [];
+  const criterioActual = CRITERIOS.find((c) => c.intensidad === intensidad && c.equidad === equidad)?.clave ?? null;
+  const enJuego = candidatas.filter((p) => !excluidasManual.has(p.id)).length;
 
   return (
     <div className="space-y-3">
-      {/* Parámetros */}
+      {/* ¿Cómo querés repartir? */}
       <div className="panel-vidrio rounded-2xl p-4">
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="block">
-            <span className="flex items-center justify-between text-[10px] font-bold tracking-wide text-texto-3 uppercase">
-              Priorizar la necesidad concentrada
-              <span className="num text-texto-2 normal-case">{intensidad.toFixed(1)}</span>
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={2}
-              step={0.1}
-              value={intensidad}
-              onChange={(e) => setIntensidad(Number(e.target.value))}
-              className="mt-1.5 w-full accent-[#e14f82]"
-            />
-            <span className="text-[10px] leading-snug text-texto-3">
-              0: cada hogar con necesidad vale lo mismo esté donde esté. Más alto: pesan más los barrios donde la necesidad
-              es mayor que el promedio de la ciudad.
-            </span>
-          </label>
-          <label className="block">
-            <span className="flex items-center justify-between text-[10px] font-bold tracking-wide text-texto-3 uppercase">
-              Repartir entre barrios
-              <span className="num text-texto-2 normal-case">{equidad.toFixed(1)}</span>
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={4}
-              step={0.1}
-              value={equidad}
-              onChange={(e) => setEquidad(Number(e.target.value))}
-              className="mt-1.5 w-full accent-[#e14f82]"
-            />
-            <span className="text-[10px] leading-snug text-texto-3">
-              0: se cubre primero, hasta agotarla, la necesidad que más rinde. Más alto: los primeros hogares de cada barrio
-              valen más que los últimos, y el presupuesto llega a más barrios.
-            </span>
-          </label>
+        <h3 className="text-sm font-extrabold">¿Cómo querés repartir?</h3>
+        <p className="mt-0.5 text-[11px] text-texto-2">
+          Elegí un criterio: la herramienta reparte sola la plata disponible entre las políticas y los barrios, y el
+          mapa se actualiza al instante.
+        </p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {CRITERIOS.map((c) => {
+            const activo = criterioActual === c.clave;
+            return (
+              <button
+                key={c.clave}
+                onClick={() => {
+                  setIntensidad(c.intensidad);
+                  setEquidad(c.equidad);
+                }}
+                className={`rounded-xl border-2 px-3 py-2.5 text-left transition ${
+                  activo ? "border-rosa bg-rosa/10" : "border-borde-2 hover:border-rosa/50"
+                }`}
+              >
+                <span className={`block text-xs font-extrabold ${activo ? "text-rosa" : ""}`}>{c.titulo}</span>
+                <span className="mt-0.5 block text-[10.5px] leading-snug text-texto-2">{c.texto}</span>
+              </button>
+            );
+          })}
         </div>
 
-        <div className="mt-3 border-t border-borde pt-3">
-          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 text-[10px] font-bold tracking-wide text-texto-3 uppercase">
-            <span>Políticas en juego</span>
-            <span className="font-normal normal-case">
-              {candidatas.filter((p) => !excluidasManual.has(p.id)).length} de {candidatas.length} · tocá para sacar o volver a poner
-            </span>
+        <details className="mt-3 border-t border-borde pt-2.5">
+          <summary className="flex cursor-pointer items-center gap-1.5 text-[11px] font-bold text-texto-2 hover:text-rosa">
+            <SlidersHorizontal size={12} /> Ajuste fino
+            {criterioActual ? "" : " (personalizado)"}
+          </summary>
+          <div className="mt-2 grid gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="flex items-center justify-between text-[10px] font-bold tracking-wide text-texto-3 uppercase">
+                Cuánto pesa la necesidad concentrada
+                <span className="num text-texto-2 normal-case">{intensidad.toFixed(1)}</span>
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={2}
+                step={0.1}
+                value={intensidad}
+                onChange={(e) => setIntensidad(Number(e.target.value))}
+                className="mt-1.5 w-full accent-[#e14f82]"
+              />
+              <span className="text-[10px] leading-snug text-texto-3">
+                A la izquierda, cada hogar con necesidad vale lo mismo esté donde esté. A la derecha, pesan más los
+                barrios donde la necesidad supera el promedio de la ciudad.
+              </span>
+            </label>
+            <label className="block">
+              <span className="flex items-center justify-between text-[10px] font-bold tracking-wide text-texto-3 uppercase">
+                Cuánto repartir entre barrios
+                <span className="num text-texto-2 normal-case">{equidad.toFixed(1)}</span>
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={4}
+                step={0.1}
+                value={equidad}
+                onChange={(e) => setEquidad(Number(e.target.value))}
+                className="mt-1.5 w-full accent-[#e14f82]"
+              />
+              <span className="text-[10px] leading-snug text-texto-3">
+                A la izquierda, se cubre primero y por completo la necesidad que más rinde. A la derecha, la plata se
+                reparte y llega a más barrios.
+              </span>
+            </label>
           </div>
-          <div className="flex flex-wrap gap-1">
+        </details>
+
+        <details className="mt-2">
+          <summary className="flex cursor-pointer items-center gap-1.5 text-[11px] font-bold text-texto-2 hover:text-rosa">
+            <Info size={12} /> Qué políticas entran ({enJuego} de {candidatas.length})
+          </summary>
+          <p className="mt-1.5 text-[10.5px] text-texto-3">Tocá una para sacarla del reparto o volver a ponerla.</p>
+          <div className="mt-1.5 flex flex-wrap gap-1">
             {candidatas.map((p) => {
               const fuera = excluidasManual.has(p.id);
               const sinDato = !(p.costo_unitario && p.costo_unitario > 0) || !INDICADORES[p.indicador];
@@ -352,7 +490,7 @@ export function Asignar({
                       return n;
                     })
                   }
-                  title={`${p.nombre}${sinDato ? " · falta costo o indicador" : ""}`}
+                  title={`${p.nombre}${sinDato ? " · falta el costo: no entra hasta cargarlo" : ""}`}
                   className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition ${
                     fuera
                       ? "border-borde text-texto-3 line-through"
@@ -366,46 +504,59 @@ export function Asignar({
               );
             })}
           </div>
-        </div>
+        </details>
       </div>
 
-      {/* Resultado */}
-      <Cifras
-        className={recalculando ? "opacity-70" : ""}
-        acciones={
-          <span className="num text-[10px] text-texto-3" title="Tiempo del motor de asignación en este navegador">
-            {Math.round(calculo.ms)} ms
-          </span>
-        }
+      {/* Resultado, primero en una frase */}
+      <div
+        className={`panel-vidrio rounded-2xl border-2 border-rosa/30 px-4 py-3 transition ${recalculando ? "opacity-70" : ""}`}
       >
-        <Cifra valor={pesos(libreTotal, true)} etiqueta="libre en partidas" />
-        <Cifra
-          valor={pesos(r.asignado, true)}
-          etiqueta="asignado"
-          tono="marca"
-          nota={libreTotal > 0 ? `${Math.round((100 * r.asignado) / libreTotal)}%` : undefined}
-        />
-        <Cifra
-          valor={pesos(r.sinAsignar, true)}
-          etiqueta="sin asignar"
-          tono={r.sinAsignar > libreTotal * 0.05 ? "aviso" : "neutro"}
-          titulo="Partidas que ninguna política activa puede usar, o necesidad ya cubierta"
-        />
-        <Cifra valor={numero(porBarrio.size)} de={numero(datos.barrios.length)} etiqueta="barrios alcanzados" />
-        <Cifra
-          valor={numero(r.porPolitica.filter((p) => p.monto > 0).length)}
-          de={numero(entradas.politicas.length)}
-          etiqueta="políticas financiadas"
-        />
-      </Cifras>
+        <div className="text-[10px] font-bold tracking-wide text-texto-3 uppercase">Así queda el reparto</div>
+        <p className="mt-1 text-[13px] leading-relaxed">
+          De <b className="num">{pesos(libreTotal, true)}</b> disponibles se reparten{" "}
+          <b className="num text-rosa">{pesos(r.asignado, true)}</b> entre{" "}
+          <b className="num">{numero(porBarrio.size)}</b> barrios, a través de{" "}
+          <b className="num">{numero(politicasConPlata.length)}</b>{" "}
+          {politicasConPlata.length === 1 ? "política" : "políticas"}.
+          {topBarrios.length > 0 && (
+            <>
+              {" "}
+              Los que más reciben:{" "}
+              {topBarrios.map((b, i) => (
+                <span key={b.id}>
+                  {i > 0 && (i === topBarrios.length - 1 ? " y " : ", ")}
+                  <button
+                    onClick={() => setBarrio(b.id)}
+                    className="font-bold underline decoration-rosa/40 underline-offset-2 hover:text-rosa"
+                  >
+                    «{b.id}»
+                  </button>
+                </span>
+              ))}
+              .
+            </>
+          )}
+        </p>
+        {r.sinAsignar > libreTotal * 0.05 && (
+          <p className="mt-1.5 flex items-start gap-1.5 text-[11px] text-encurso">
+            <TriangleAlert size={13} className="mt-0.5 shrink-0" />
+            <span>
+              Quedan <b className="num">{pesos(r.sinAsignar, true)}</b> sin repartir: esa plata está en partidas que
+              ninguna política activa puede usar, o ya se cubrió toda la necesidad posible. Podés sumar políticas o
+              cargar el costo de las que faltan en el paso 2.
+            </span>
+          </p>
+        )}
+      </div>
 
       {(r.avisos.length > 0 || entradas.excluidas.length > 0) && (
         <details className="panel-vidrio rounded-2xl border-encurso/40 px-4 py-2.5 text-[11px]">
           <summary className="flex cursor-pointer items-center gap-1.5 font-bold text-encurso">
             <TriangleAlert size={12} />
-            {entradas.excluidas.length > 0 && `${entradas.excluidas.length} políticas quedaron afuera`}
+            {entradas.excluidas.length > 0 &&
+              `${entradas.excluidas.length} políticas no entran al reparto (ver por qué)`}
             {entradas.excluidas.length > 0 && r.avisos.length > 0 && " · "}
-            {r.avisos.length > 0 && `${r.avisos.length} avisos del cálculo`}
+            {r.avisos.length > 0 && `${r.avisos.length} avisos`}
           </summary>
           <ul className="mt-2 space-y-0.5 text-texto-2">
             {entradas.excluidas.map((e) => (
@@ -440,7 +591,9 @@ export function Asignar({
                 </button>
               ))}
             </div>
-            <span className="text-[10px] text-texto-3">Tocá un barrio para ver y ajustar su asignación</span>
+            <span className="text-right text-[10px] text-texto-3">
+              Cuanto más rosa, más recibe. Tocá un barrio para ver el detalle.
+            </span>
           </div>
           <MapaBarrios
             valores={valoresMapa}
@@ -451,10 +604,11 @@ export function Asignar({
           />
         </div>
 
-        <div className="panel-vidrio min-w-0 rounded-2xl p-4">
+        <div ref={detalleRef} className="panel-vidrio min-w-0 scroll-mt-20 rounded-2xl p-4">
           {!seleccion ? (
-            <Vacio icono={Info} titulo="Elegí un barrio" variante="filtro">
-              En el mapa o en la tabla de abajo. Vas a ver qué recibe, cuánta necesidad cubre y podés fijar montos a mano.
+            <Vacio icono={Info} titulo="Tocá un barrio en el mapa" variante="filtro">
+              Vas a ver qué recibe de cada política y cuánto de su necesidad cubre. Si querés darle más o menos a algo,
+              lo podés cambiar a mano desde ahí.
             </Vacio>
           ) : (
             <BarrioDetalle
@@ -475,7 +629,10 @@ export function Asignar({
               onFijar={(pol, monto) =>
                 monto == null
                   ? soltar([`${pol}|${seleccion.id}`])
-                  : setFijos((f) => ({ ...f, [`${pol}|${seleccion.id}`]: monto }))
+                  : setFijos((f) => ({
+                      ...f,
+                      [`${pol}|${seleccion.id}`]: monto,
+                    }))
               }
               onCerrar={() => setBarrio(null)}
             />
@@ -484,18 +641,21 @@ export function Asignar({
       </div>
 
       {/* Por política */}
-      <div className="panel-vidrio rounded-2xl p-4">
-        <h3 className="text-[11px] font-bold tracking-wide text-texto-2 uppercase">Por política</h3>
+      <details className="panel-vidrio group rounded-2xl p-4">
+        <summary className="cursor-pointer text-sm font-extrabold hover:text-rosa">
+          Detalle por política{" "}
+          <span className="text-[11px] font-normal text-texto-3">· cuánto recibe cada una y de qué partida sale</span>
+        </summary>
         <div className="mt-2 overflow-auto">
           <table className="w-full min-w-[760px] text-[11px]">
             <thead className="sticky top-0 z-10 bg-panel/95 text-left text-texto-3 backdrop-blur">
               <tr>
                 <th className="py-1 pr-2 font-semibold">Política</th>
                 <th className="num py-1 pr-2 text-right font-semibold">Asignado</th>
-                <th className="num py-1 pr-2 text-right font-semibold">Unidades</th>
-                <th className="py-1 pr-2 font-semibold">Cobertura</th>
-                <th className="py-1 pr-2 font-semibold">Frena por</th>
-                <th className="py-1 font-semibold">La pagan</th>
+                <th className="num py-1 pr-2 text-right font-semibold">Qué se logra</th>
+                <th className="py-1 pr-2 font-semibold">Necesidad cubierta</th>
+                <th className="py-1 pr-2 font-semibold">Por qué no recibe más</th>
+                <th className="py-1 font-semibold">Sale de</th>
               </tr>
             </thead>
             <tbody>
@@ -517,27 +677,31 @@ export function Asignar({
                       </td>
                       <td className="num py-1.5 pr-2 text-right font-bold">{pesos(p.monto, true)}</td>
                       <td className="num py-1.5 pr-2 text-right">
-                        {numero(p.unidades)}
-                        <span className="text-texto-3"> / {numero(p.necesidad)}</span>
+                        {numero(p.unidades)}{" "}
+                        <span className="text-texto-3">{plural(pol?.unidad ?? "", Math.round(p.unidades))}</span>
+                        <div className="text-[9.5px] text-texto-3">de {numero(p.necesidad)} que hacen falta</div>
                       </td>
                       <td className="py-1.5 pr-2">
                         <div className="flex items-center gap-1.5">
                           <div className="h-1.5 w-20 overflow-hidden rounded-full bg-panel-3">
-                            <div className="h-full rounded-full bg-rosa" style={{ width: `${Math.min(100, 100 * cob)}%` }} />
+                            <div
+                              className="h-full rounded-full bg-rosa"
+                              style={{ width: `${Math.min(100, 100 * cob)}%` }}
+                            />
                           </div>
-                          <span className="num text-texto-2">{(100 * cob).toFixed(1)}%</span>
+                          <span className="num text-texto-2">{pct(100 * cob)}</span>
                         </div>
                       </td>
                       <td className="py-1.5 pr-2 text-texto-2">
                         {p.saturada === "fondos"
-                          ? "sin fondos compatibles"
+                          ? "no hay partidas que la puedan pagar"
                           : p.saturada === "tope"
-                            ? "llegó a su tope"
+                            ? "llegó al tope que se le puso"
                             : p.saturada === "necesidad"
-                              ? "necesidad cubierta"
+                              ? "ya cubre toda la necesidad"
                               : p.monto > 0
-                                ? "rinde menos que otras"
-                                : "—"}
+                                ? "otras resuelven más necesidad por peso"
+                                : "otras resuelven más necesidad por peso"}
                       </td>
                       <td className="max-w-56 truncate py-1.5 text-[10px] text-texto-3">
                         {(financiadoPor.get(p.politica) ?? [])
@@ -551,29 +715,30 @@ export function Asignar({
             </tbody>
           </table>
         </div>
-      </div>
+      </details>
 
       {/* Por barrio */}
-      <div className="panel-vidrio rounded-2xl p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-[11px] font-bold tracking-wide text-texto-2 uppercase">Por barrio</h3>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 rounded-lg border border-borde-2 bg-panel px-2 py-1">
-              <Search size={12} className="text-texto-3" />
-              <input
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                placeholder="Buscar barrio…"
-                className="w-36 bg-transparent text-[11px] outline-none placeholder:text-texto-3"
-              />
-            </div>
-            <button
-              onClick={exportar}
-              className="flex items-center gap-1 rounded-lg border border-borde-2 px-2.5 py-1.5 text-[11px] font-bold text-texto-2 transition hover:border-rosa/50 hover:text-rosa"
-            >
-              <Download size={12} /> CSV
-            </button>
+      <details className="panel-vidrio rounded-2xl p-4">
+        <summary className="cursor-pointer text-sm font-extrabold hover:text-rosa">
+          Detalle por barrio{" "}
+          <span className="text-[11px] font-normal text-texto-3">· la lista completa, para buscar o descargar</span>
+        </summary>
+        <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+          <div className="flex items-center gap-1.5 rounded-lg border border-borde-2 bg-panel px-2 py-1">
+            <Search size={12} className="text-texto-3" />
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar barrio…"
+              className="w-36 bg-transparent text-[11px] outline-none placeholder:text-texto-3"
+            />
           </div>
+          <button
+            onClick={exportar}
+            className="flex items-center gap-1 rounded-lg border border-borde-2 px-2.5 py-1.5 text-[11px] font-bold text-texto-2 transition hover:border-rosa/50 hover:text-rosa"
+          >
+            <Download size={12} /> Descargar planilla
+          </button>
         </div>
         <div className="mt-2 max-h-96 overflow-auto">
           <table className="w-full min-w-[560px] text-[11px]">
@@ -583,8 +748,13 @@ export function Asignar({
                 <th className="num py-1 pr-2 text-right font-semibold">Asignado</th>
                 <th className="num py-1 pr-2 text-right font-semibold">Por hogar</th>
                 <th className="num py-1 pr-2 text-right font-semibold">Hogares</th>
-                <th className="num py-1 pr-2 text-right font-semibold">NBI</th>
-                <th className="num py-1 text-right font-semibold">Políticas</th>
+                <th
+                  className="num py-1 pr-2 text-right font-semibold"
+                  title="Hogares con necesidades básicas insatisfechas"
+                >
+                  Hogares con NBI
+                </th>
+                <th className="num py-1 text-right font-semibold">Políticas que recibe</th>
               </tr>
             </thead>
             <tbody>
@@ -598,7 +768,7 @@ export function Asignar({
                   <td className="num py-1 pr-2 text-right font-bold">{pesos(f.monto, true)}</td>
                   <td className="num py-1 pr-2 text-right">{f.hogares > 0 ? pesos(f.monto / f.hogares) : "—"}</td>
                   <td className="num py-1 pr-2 text-right text-texto-2">{numero(f.hogares)}</td>
-                  <td className="num py-1 pr-2 text-right text-texto-2">{f.pctNbi.toFixed(1)}%</td>
+                  <td className="num py-1 pr-2 text-right text-texto-2">{pct(f.pctNbi)}</td>
                   <td className="num py-1 text-right text-texto-2">{f.politicas}</td>
                 </tr>
               ))}
@@ -610,60 +780,89 @@ export function Asignar({
             </p>
           )}
         </div>
-      </div>
+      </details>
 
       {/* Guardar */}
       <div className="panel-vidrio rounded-2xl p-4">
         <h3 className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-texto-2 uppercase">
-          <Save size={12} className="text-rosa" /> Guardar como escenario
+          <Save size={12} className="text-rosa" /> ¿Te sirve este reparto? Guardalo como propuesta
         </h3>
-        <p className="mt-1 text-[10.5px] text-texto-3">
-          Se guarda como borrador. Para que reserve crédito, lo tiene que aprobar el superadmin con el número de la norma.
-          La base vuelve a controlar que ninguna partida quede excedida.
-        </p>
-        <div className="mt-2 grid gap-2 md:grid-cols-[240px_1fr]">
-          <input
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            placeholder="Nombre (ej. Plan barrios sur, 2º semestre)"
-            className="rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-rosa/50"
-          />
-          <textarea
-            value={criterio}
-            onChange={(e) => setCriterio(e.target.value)}
-            rows={2}
-            placeholder="Criterio: por qué esta asignación (qué se priorizó y con qué fundamento). Queda como antecedente del acto."
-            className="resize-y rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-rosa/50"
-          />
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => void guardar()}
-            disabled={guardando || r.asignado <= 0}
-            className="flex items-center gap-1.5 rounded-lg bg-rosa px-3 py-2 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-40"
-          >
-            <Save size={13} /> {guardando ? "Guardando…" : "Guardar escenario"}
-          </button>
-          <span className={`text-[10px] ${criterio.trim().length >= 20 ? "text-completo" : "text-texto-3"}`}>
-            criterio: {criterio.trim().length}/20
-          </span>
-          {mensaje && (
-            <span className={`text-[11px] font-bold ${mensaje.ok ? "text-completo" : "text-peligro"}`}>{mensaje.texto}</span>
-          )}
-          {fijosHuerfanos.length > 0 && (
-            <span className="flex items-center gap-1.5 text-[10.5px] text-encurso">
-              {fijosHuerfanos.length} monto{fijosHuerfanos.length === 1 ? "" : "s"} fijado{fijosHuerfanos.length === 1 ? "" : "s"} de políticas que ya no están en juego (no se guarda{fijosHuerfanos.length === 1 ? "" : "n"})
-              <button onClick={() => soltar(fijosHuerfanos)} className="font-bold underline">
-                soltar
+        {ejemplo ? (
+          <p className="mt-1 text-[11px] font-semibold text-encurso">
+            En el ejemplo no se guarda nada. Cuando tengas la plata disponible y los costos reales (pasos 1 y 2), salí
+            del ejemplo y guardá acá la propuesta.
+            {onEjemplo && (
+              <button onClick={onEjemplo} className="ml-1.5 font-bold underline">
+                Salir del ejemplo
               </button>
-            </span>
-          )}
-          {mensaje?.ok && (
-            <button onClick={() => irA("escenarios")} className="text-[11px] font-semibold text-rosa hover:underline">
-              ver escenarios
-            </button>
-          )}
-        </div>
+            )}
+          </p>
+        ) : (
+          <p className="mt-1 text-[10.5px] text-texto-3">
+            Guardar no gasta ni reserva nada: queda como borrador para comparar. En el paso 4 se manda a aprobar, y la
+            aprueba otra persona con el número de la norma. Recién ahí la plata queda reservada.
+          </p>
+        )}
+        {!ejemplo && (
+          <>
+            <div className="mt-2 grid gap-2 md:grid-cols-[240px_1fr]">
+              <input
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                placeholder="Nombre (ej. Plan barrios sur, 2º semestre)"
+                className="rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-rosa/50"
+              />
+              <textarea
+                value={criterio}
+                onChange={(e) => setCriterio(e.target.value)}
+                rows={2}
+                placeholder="¿Por qué este reparto? Ej.: se priorizó cloacas y agua en los barrios con más NBI del sur. Queda como fundamento de la norma."
+                className="resize-y rounded-lg border border-borde-2 bg-panel px-2.5 py-2 text-xs outline-none placeholder:text-texto-3 focus:border-rosa/50"
+              />
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => void guardar()}
+                disabled={guardando || r.asignado <= 0 || ejemplo}
+                title={
+                  ejemplo ? "En el ejemplo no se guarda nada: salí del ejemplo para trabajar con datos reales" : ""
+                }
+                className="flex items-center gap-1.5 rounded-lg bg-rosa px-3 py-2 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-40"
+              >
+                <Save size={13} /> {guardando ? "Guardando…" : "Guardar propuesta"}
+              </button>
+              <span className={`text-[10px] ${criterio.trim().length >= 20 ? "text-completo" : "text-texto-3"}`}>
+                {criterio.trim().length >= 20
+                  ? "✓ fundamento"
+                  : `el porqué: faltan ${20 - criterio.trim().length} letras`}
+              </span>
+              {mensaje && (
+                <span className={`text-[11px] font-bold ${mensaje.ok ? "text-completo" : "text-peligro"}`}>
+                  {mensaje.texto}
+                </span>
+              )}
+              {fijosHuerfanos.length > 0 && (
+                <span className="flex items-center gap-1.5 text-[10.5px] text-encurso">
+                  {fijosHuerfanos.length} monto
+                  {fijosHuerfanos.length === 1 ? "" : "s"} fijado
+                  {fijosHuerfanos.length === 1 ? "" : "s"} de políticas que ya no están en juego (no se guarda
+                  {fijosHuerfanos.length === 1 ? "" : "n"})
+                  <button onClick={() => soltar(fijosHuerfanos)} className="font-bold underline">
+                    soltar
+                  </button>
+                </span>
+              )}
+              {mensaje?.ok && (
+                <button
+                  onClick={() => irA("escenarios")}
+                  className="text-[11px] font-semibold text-rosa hover:underline"
+                >
+                  ir al paso 4 →
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       <MetodoNota />
@@ -715,7 +914,12 @@ function BarrioDetalle({
   const total = asignaciones.reduce((a, x) => a + x.monto, 0);
   const porPol = new Map(asignaciones.map((a) => [a.politica, a]));
   const filas = celdas
-    .map((c) => ({ id: c.politica, necesidad: c.unidades, a: porPol.get(c.politica), pol: politicas.get(c.politica) }))
+    .map((c) => ({
+      id: c.politica,
+      necesidad: c.unidades,
+      a: porPol.get(c.politica),
+      pol: politicas.get(c.politica),
+    }))
     .filter((f) => f.pol)
     .sort((x, y) => (y.a?.monto ?? 0) - (x.a?.monto ?? 0));
   const ajustados = filas.filter((f) => fijos[`${f.id}|${nombre}`] != null).length;
@@ -726,9 +930,9 @@ function BarrioDetalle({
         <div className="min-w-0">
           <h3 className="truncate text-sm font-extrabold">{nombre}</h3>
           <p className="text-[10px] text-texto-3">
-            {Math.round(poblacion).toLocaleString("es-AR")} hab. · {Math.round(hogares).toLocaleString("es-AR")} hogares ·
-            NBI {hogares > 0 ? ((100 * (indicadores.nbi ?? 0)) / hogares).toFixed(1) : "0"}% · sin cloaca{" "}
-            {hogares > 0 ? ((100 * (indicadores.sin_cloaca ?? 0)) / hogares).toFixed(1) : "0"}%
+            {Math.round(poblacion).toLocaleString("es-AR")} hab. · {Math.round(hogares).toLocaleString("es-AR")} hogares
+            · NBI {pct(hogares > 0 ? (100 * (indicadores.nbi ?? 0)) / hogares : 0)} · sin cloaca{" "}
+            {pct(hogares > 0 ? (100 * (indicadores.sin_cloaca ?? 0)) / hogares : 0)}
           </p>
         </div>
         <button onClick={onCerrar} className="shrink-0 text-texto-3 hover:text-texto" aria-label="Cerrar">
@@ -738,11 +942,15 @@ function BarrioDetalle({
       <div className="num mt-2 text-xl font-extrabold text-rosa">{pesos(total, true)}</div>
       <p className="text-[10px] text-texto-3">
         {hogares > 0 ? `${pesos(total / hogares)} por hogar · ` : ""}
-        {ajustados > 0 ? `${ajustados} ajustado${ajustados === 1 ? "" : "s"} a mano` : "el candado fija un monto y el resto se reoptimiza"}
+        {ajustados > 0
+          ? `${ajustados} ajustado${ajustados === 1 ? "" : "s"} a mano`
+          : "tocá el candado para darle un monto a mano; el resto se reacomoda solo"}
       </p>
 
       {filas.length === 0 && (
-        <p className="mt-3 text-[11px] text-texto-3">Ninguna política en juego tiene necesidad medida en este barrio.</p>
+        <p className="mt-3 text-[11px] text-texto-3">
+          Ninguna política en juego tiene necesidad medida en este barrio.
+        </p>
       )}
 
       <div className="mt-3 max-h-[300px] space-y-1 overflow-auto pr-1">
@@ -755,7 +963,10 @@ function BarrioDetalle({
           const estado = fijados.find((x) => x.politica === id && x.destino === nombre);
           const delMotor = motor?.get(clave) ?? 0;
           return (
-            <div key={id} className={`rounded-lg border px-2 py-1.5 ${fijado ? "border-rosa/40 bg-rosa/5" : "border-borde"}`}>
+            <div
+              key={id}
+              className={`rounded-lg border px-2 py-1.5 ${fijado ? "border-rosa/40 bg-rosa/5" : "border-borde"}`}
+            >
               <div className="flex items-center gap-1.5">
                 <span className="min-w-0 flex-1 truncate text-[11px] font-semibold" title={pol!.nombre}>
                   <span className="text-texto-3">{pol!.codigo}</span> {pol!.nombre}
@@ -777,8 +988,8 @@ function BarrioDetalle({
               </div>
               {a && (
                 <div className="mt-0.5 text-[9.5px] text-texto-3">
-                  {Math.round(a.unidades).toLocaleString("es-AR")} {pol!.unidad || "unidades"} · cubre el{" "}
-                  {(100 * a.cobertura).toFixed(1)}% de {info ? info.etiqueta.toLowerCase() : "la necesidad"}
+                  {Math.round(a.unidades).toLocaleString("es-AR")} {plural(pol!.unidad, Math.round(a.unidades))} · cubre
+                  el {pct(100 * a.cobertura)} de {info ? info.etiqueta.toLowerCase() : "la necesidad"}
                 </div>
               )}
               {fijado && (
@@ -786,7 +997,10 @@ function BarrioDetalle({
                   <div className="text-[9.5px] text-texto-2">
                     Fijado en {pesos(fijos[clave])}
                     {estado && Math.abs(estado.efectivo - fijos[clave]) >= 1 && (
-                      <span className="text-encurso"> · se asignan {pesos(estado.efectivo)} ({estado.motivo})</span>
+                      <span className="text-encurso">
+                        {" "}
+                        · se asignan {pesos(estado.efectivo)} ({estado.motivo})
+                      </span>
                     )}
                     {motor && <span className="text-texto-3"> · el motor daba {pesos(delMotor)}</span>}
                   </div>
@@ -838,31 +1052,36 @@ function BarrioDetalle({
 
 function MetodoNota() {
   return (
-    <div className="panel-vidrio rounded-2xl border-encurso/40 p-4">
-      <h3 className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-encurso uppercase">
-        <Info size={12} /> Cómo decide el motor
-      </h3>
-      <div className="mt-1.5 space-y-1.5 text-[11px] leading-relaxed text-texto-2">
+    <details className="panel-vidrio rounded-2xl p-4">
+      <summary className="flex cursor-pointer items-center gap-1.5 text-sm font-extrabold hover:text-rosa">
+        <Info size={14} className="text-rosa" /> ¿Cómo decide a dónde va la plata?
+      </summary>
+      <p className="mt-1.5 text-[12px] leading-relaxed">
+        Mira cuánta necesidad tiene cada barrio según el Censo 2022 (hogares sin cloaca, sin agua, con NBI…) y cuánto
+        cuesta cubrirla con cada política. Pone cada peso donde más necesidad resuelve, respetando qué partidas pueden
+        pagar qué cosa. El criterio que elegís arriba decide si concentrar o repartir.
+      </p>
+      <div className="mt-2 space-y-1.5 border-t border-borde pt-2 text-[11px] leading-relaxed text-texto-2">
+        <div className="text-[10px] font-bold tracking-wide text-texto-3 uppercase">El detalle técnico</div>
         <p>
           Cada política convierte pesos en <b>unidades de necesidad cubiertas</b> —hogares conectados, cupos, personas
           atendidas— según su costo por unidad, y la necesidad de cada barrio la da el Censo 2022. El valor se mide en{" "}
-          <b>pesos de necesidad cubierta</b>: prioridad de la política × intensidad de la necesidad en el barrio × costo de
-          cubrirla. Así una política no se come el presupuesto solo porque sus unidades sean más baratas.
+          <b>pesos de necesidad cubierta</b>: prioridad de la política × intensidad de la necesidad en el barrio × costo
+          de cubrirla. Así una política no se come el presupuesto solo porque sus unidades sean más baratas.
         </p>
         <p>
           Cada partida paga solo lo que su sección, su partida principal y su afectación permiten, y personal (PP 11),
-          intereses (21), inversión financiera (61) y amortización (71)
-          nunca entran. Con eso, el motor reparte el crédito libre para cubrir la mayor necesidad posible: es el{" "}
-          <b>óptimo</b> del problema (salvo, a lo sumo, un incremento por barrio y política, que es lo que permite
-          recalcular la ciudad entera en milisegundos), y cuando una partida se agota reasigna qué partida paga qué
-          antes de dejar a una política sin fondos.
+          intereses (21), inversión financiera (61) y amortización (71) nunca entran. Con eso, el motor reparte el
+          crédito libre para cubrir la mayor necesidad posible: es el <b>óptimo</b> del problema (salvo, a lo sumo, un
+          incremento por barrio y política, que es lo que permite recalcular la ciudad entera en milisegundos), y cuando
+          una partida se agota reasigna qué partida paga qué antes de dejar a una política sin fondos.
         </p>
         <p>
-          <b>Límites.</b> La necesidad por barrio se reparte desde los radios censales en proporción a la superficie; los
-          barrios más chicos que un radio pueden no aparecer, y los cuatro nombres repetidos del mapa (Vial, San José, San
-          Martín, San Miguel) salen sumados. El censo es de 2022.
+          <b>Límites.</b> La necesidad por barrio se reparte desde los radios censales en proporción a la superficie;
+          los barrios más chicos que un radio pueden no aparecer, y los cuatro nombres repetidos del mapa (Vial, San
+          José, San Martín, San Miguel) salen sumados. El censo es de 2022.
         </p>
       </div>
-    </div>
+    </details>
   );
 }

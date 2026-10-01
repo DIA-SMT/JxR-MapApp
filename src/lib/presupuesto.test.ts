@@ -10,6 +10,8 @@ import {
   normalizarPP,
   parsearImporte,
   partidaCompatible,
+  pct,
+  plural,
   type BarrioNecesidad,
   type Partida,
   type Politica,
@@ -262,4 +264,22 @@ test("encuentra el encabezado aunque el reporte traiga un título, y numera como
   const r = leerPartidas("Reporte de ejecución presupuestaria al 30/06/2026\n\ncodigo;partida principal;credito vigente\nA;52;1000\n\n\nB;52;abc\n");
   assert.equal(r.filas.length, 1);
   assert.ok(r.errores.some((e) => e.startsWith("Fila 7:")), r.errores.join(" | "));
+});
+
+test("plural: unidades de las políticas", () => {
+  assert.equal(plural("hogar"), "hogares");
+  assert.equal(plural("persona mayor"), "personas mayores");
+  assert.equal(plural("habitante"), "habitantes");
+  assert.equal(plural("conexión"), "conexiones");
+  assert.equal(plural("cupo en taller"), "cupos en taller");
+  assert.equal(plural("luz"), "luces");
+  assert.equal(plural("hogares"), "hogares");
+  assert.equal(plural("hogar", 1), "hogar");
+  assert.equal(plural(""), "unidades");
+  assert.equal(plural("m2"), "m2");
+});
+
+test("pct: coma decimal", () => {
+  assert.equal(pct(22.44), "22,4%");
+  assert.equal(pct(NaN), "0,0%");
 });
