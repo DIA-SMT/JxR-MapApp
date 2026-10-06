@@ -19,6 +19,7 @@ import { asignarPresupuesto, type ResultadoAsignacion } from "@/lib/asignacion";
 import {
   armarEntradas,
   INDICADORES,
+  leerLimites,
   libreAsignable,
   parsearImporte,
   pct,
@@ -29,17 +30,12 @@ import { guardarEscenario, type Ajuste } from "@/lib/presupuesto-datos";
 import { descargarCSV } from "@/lib/csv";
 import { Vacio } from "@/components/ui/vacio";
 import { MapaBarrios } from "./mapa-barrios";
+import { CRITERIOS, pesos } from "@/lib/presupuesto";
+export { pesos, resumenParametros } from "@/lib/presupuesto";
+import { MontosPorPolitica } from "./montos-politica";
 import type { DatosPresupuesto } from "./panel";
 
 const numero = (n: number) => Math.round(n).toLocaleString("es-AR");
-
-/** $ 1.234.567 o, compacto, $ 1.234,6 M. */
-export function pesos(n: number, compacto = false): string {
-  if (compacto && Math.abs(n) >= 1e6) {
-    return `$ ${(n / 1e6).toLocaleString("es-AR", { maximumFractionDigits: n >= 1e9 ? 0 : 1 })} M`;
-  }
-  return `$ ${Math.round(n).toLocaleString("es-AR")}`;
-}
 
 const TIPO: Record<string, string> = {
   obra: "Obra",
@@ -50,35 +46,6 @@ const TIPO: Record<string, string> = {
 };
 
 type Vista = "total" | "hogar";
-
-/**
- * Los tres criterios que se ofrecen, en lenguaje llano. Cada uno es una
- * combinación de los dos parámetros del motor: cuánto pesa que la necesidad
- * esté concentrada (intensidad) y cuánto se reparte entre barrios (equidad).
- */
-const CRITERIOS = [
-  {
-    clave: "necesidad",
-    titulo: "Donde más se necesita",
-    texto: "Concentra la plata en los barrios con más necesidad que el promedio de la ciudad.",
-    intensidad: 2,
-    equidad: 0.5,
-  },
-  {
-    clave: "equilibrado",
-    titulo: "Equilibrado",
-    texto: "Prioriza la necesidad, pero sin dejar afuera a los barrios con necesidad media.",
-    intensidad: 1,
-    equidad: 1,
-  },
-  {
-    clave: "alcance",
-    titulo: "Llegar a más barrios",
-    texto: "Reparte para que la mayor cantidad de barrios reciba algo, aunque sea menos.",
-    intensidad: 0.5,
-    equidad: 3,
-  },
-] as const;
 
 export function Asignar({
   supabase,
@@ -100,6 +67,9 @@ export function Asignar({
   const [equidad, setEquidad] = useState(1);
   const [excluidasManual, setExcluidasManual] = useState<Set<number>>(new Set());
   const [fijos, setFijos] = useState<Record<string, number>>({});
+  // «al menos» y «como máximo» por política, tal como se escribieron
+  const [textoLimites, setTextoLimites] = useState<Record<string, string>>({});
+  const leidos = useMemo(() => leerLimites(textoLimites), [textoLimites]);
   // por qué se tocó cada celda: quien aprueba ve cada desvío del criterio
   const [motivos, setMotivos] = useState<Record<string, string>>({});
   const [barrio, setBarrio] = useState<string | null>(null);
@@ -131,14 +101,32 @@ export function Asignar({
     [datos.partidas],
   );
 
+  // Lo que vale es lo efectivo: lo decidido acá o, si falta, lo del catálogo. Un piso por encima del
+  // tope (contando el del catálogo) no se aplica. Solo cuentan las políticas que están en juego.
+  const { limites, invalidas } = useMemo(() => {
+    const enJuego = new Map(candidatas.filter((p) => !excluidasManual.has(p.id)).map((p) => [p.id, p]));
+    const invalidas = new Set([...leidos.invalidas].filter((id) => enJuego.has(id)));
+    const limites: typeof leidos.limites = {};
+    for (const [idTxt, l] of Object.entries(leidos.limites)) {
+      const pol = enJuego.get(Number(idTxt));
+      if (!pol) continue;
+      const piso = l.piso ?? pol.piso;
+      const tope = l.tope ?? pol.tope;
+      if (piso != null && tope != null && piso > tope) invalidas.add(pol.id);
+      else limites[pol.id] = l;
+    }
+    return { limites, invalidas };
+  }, [leidos, candidatas, excluidasManual]);
+
   const parametros = useMemo(
     () => ({
       intensidad,
       equidad,
       politicas: candidatas.filter((p) => !excluidasManual.has(p.id)).map((p) => p.id),
       fijos,
+      limites,
     }),
-    [intensidad, equidad, candidatas, excluidasManual, fijos],
+    [intensidad, equidad, candidatas, excluidasManual, fijos, limites],
   );
   // Los deslizadores responden al instante; el cálculo va un paso atrás si hace falta.
   const diferidos = useDeferredValue(parametros);
@@ -292,6 +280,8 @@ export function Asignar({
         ok: false,
         texto: "Explicá el criterio (al menos 20 caracteres): es el fundamento del acto.",
       });
+    if (invalidas.size > 0)
+      return setMensaje({ ok: false, texto: "Hay montos por política sin corregir (al menos / como máximo)." });
     const sinMotivo = fijosVigentes.filter((k) => (motivos[k] ?? "").trim().length < 5);
     if (sinMotivo.length > 0) {
       return setMensaje({
@@ -319,6 +309,15 @@ export function Asignar({
         equidad,
         politicas: parametros.politicas,
         fijos: Object.fromEntries(fijosVigentes.map((k) => [k, fijos[k]])),
+        // solo los de políticas que entraron al reparto
+        limites: Object.fromEntries(
+          Object.entries(limites)
+            .filter(([id]) => entradas.politicas.some((p) => p.id === id))
+            .map(([id, l]) => {
+              const p = polPorId.get(id);
+              return [id, { ...l, nombre: p ? `${p.codigo} ${p.nombre}` : undefined }];
+            }),
+        ),
       },
       resultado: r,
       ajustes,
@@ -506,6 +505,15 @@ export function Asignar({
           </div>
         </details>
       </div>
+
+      <MontosPorPolitica
+        politicas={candidatas.filter((p) => entradas.politicas.some((e) => e.id === String(p.id)))}
+        montoActual={new Map(r.porPolitica.map((p) => [p.politica, p.monto]))}
+        texto={textoLimites}
+        onTexto={setTextoLimites}
+        limites={limites}
+        invalidas={invalidas}
+      />
 
       {/* Resultado, primero en una frase */}
       <div

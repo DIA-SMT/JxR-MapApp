@@ -1,6 +1,21 @@
 "use client";
 
-import { Check, ChevronDown, ChevronRight, Download, FileCheck2, History, KeyRound, Send, Trash2, TriangleAlert, X } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  FileCheck2,
+  FileText,
+  History,
+  KeyRound,
+  Send,
+  Target,
+  Trash2,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -18,7 +33,9 @@ import {
 } from "@/lib/presupuesto-datos";
 import { descargarCSV } from "@/lib/csv";
 import { Vacio } from "@/components/ui/vacio";
-import { pesos } from "./asignar";
+import { pesos, resumenParametros } from "./asignar";
+import { Comparar } from "./comparar";
+import { Seguimiento } from "./seguimiento";
 import type { DatosPresupuesto } from "./panel";
 
 const CHIP: Record<EstadoEscenario, string> = {
@@ -30,7 +47,15 @@ const CHIP: Record<EstadoEscenario, string> = {
 };
 
 const fecha = (s: string | null) =>
-  s ? new Date(s).toLocaleString("es-AR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+  s
+    ? new Date(s).toLocaleString("es-AR", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
 
 type Pedido = { estado: "aprobado" | "ejecutado" | "descartado"; titulo: string; ayuda: string };
 
@@ -48,13 +73,32 @@ export function Escenarios({
   const [abierto, setAbierto] = useState<number | null>(null);
   const [verBitacora, setVerBitacora] = useState(false);
   const [verAccesos, setVerAccesos] = useState(false);
+  const [comparando, setComparando] = useState(false);
 
   return (
     <div className="space-y-2">
+      {datos.escenarios.length >= 2 &&
+        (comparando ? (
+          <Comparar supabase={supabase} escenarios={datos.escenarios} onCerrar={() => setComparando(false)} />
+        ) : (
+          <button
+            onClick={() => setComparando(true)}
+            className="panel-vidrio flex w-full items-center gap-2 rounded-2xl border-2 border-dashed border-rosa/30 px-4 py-2.5 text-left transition hover:border-rosa/60"
+          >
+            <ArrowLeftRight size={14} className="shrink-0 text-rosa" />
+            <span className="min-w-0">
+              <span className="block text-xs font-extrabold">Comparar dos propuestas</span>
+              <span className="block text-[10.5px] text-texto-3">
+                Qué barrios y qué políticas ganan o pierden con cada una, con el mapa de la diferencia.
+              </span>
+            </span>
+          </button>
+        ))}
+
       {datos.escenarios.length === 0 ? (
         <Vacio icono={History} titulo="Todavía no hay escenarios">
-          Armá una asignación en «Asignar» y guardala con su criterio. Queda como borrador hasta que la apruebe el superadmin
-          —que no puede ser quien la armó— con el número de la norma.
+          Armá una asignación en «Asignar» y guardala con su criterio. Queda como borrador hasta que la apruebe el
+          superadmin —que no puede ser quien la armó— con el número de la norma.
         </Vacio>
       ) : (
         datos.escenarios.map((e) => (
@@ -160,10 +204,33 @@ function FilaEscenario({
     if (!detalle) return;
     descargarCSV(
       `escenario-${e.id}-${e.nombre.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`,
-      ["escenario", "estado", "norma", "boletin", "politica_codigo", "politica", "tipo", "barrio", "monto", "unidades", "unidad", "fijado_a_mano"],
+      [
+        "escenario",
+        "estado",
+        "norma",
+        "boletin",
+        "politica_codigo",
+        "politica",
+        "tipo",
+        "barrio",
+        "monto",
+        "unidades",
+        "unidad",
+        "fijado_a_mano",
+      ],
       detalle.asignaciones.map((a) => [
-        e.nombre, e.estado, e.norma, e.boletin, a.politica_codigo, a.politica_nombre, a.politica_tipo,
-        a.barrio, Math.round(a.monto), a.unidades, a.unidad, a.fijado,
+        e.nombre,
+        e.estado,
+        e.norma,
+        e.boletin,
+        a.politica_codigo,
+        a.politica_nombre,
+        a.politica_tipo,
+        a.barrio,
+        Math.round(a.monto),
+        a.unidades,
+        a.unidad,
+        a.fijado,
       ]),
     );
   };
@@ -173,7 +240,12 @@ function FilaEscenario({
     descargarCSV(
       `escenario-${e.id}-financiamiento.csv`,
       ["partida", "partida_principal", "politica", "monto"],
-      detalle.financiamiento.map((f) => [f.partida_codigo, f.partida_principal, nombrePol.get(f.politica_id), Math.round(f.monto)]),
+      detalle.financiamiento.map((f) => [
+        f.partida_codigo,
+        f.partida_principal,
+        nombrePol.get(f.politica_id),
+        Math.round(f.monto),
+      ]),
     );
   };
 
@@ -183,13 +255,28 @@ function FilaEscenario({
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [detalle]);
 
+  const limites = useMemo(() => {
+    const l = e.parametros.limites;
+    if (!l || typeof l !== "object") return [];
+    return Object.entries(l as Record<string, { piso?: number; tope?: number }>).map(([id, v]) => ({
+      id: Number(id),
+      piso: typeof v?.piso === "number" ? v.piso : null,
+      tope: typeof v?.tope === "number" ? v.tope : null,
+    }));
+  }, [e.parametros]);
+
   const nuncaPropuesto = !e.propuesto_en && !e.aprobado_en;
-  const campo = "rounded-lg border border-borde-2 bg-panel px-2 py-1.5 text-[11px] outline-none placeholder:text-texto-3 focus:border-rosa/50";
+  const campo =
+    "rounded-lg border border-borde-2 bg-panel px-2 py-1.5 text-[11px] outline-none placeholder:text-texto-3 focus:border-rosa/50";
 
   return (
     <div className="panel-vidrio rounded-2xl">
       <button onClick={onAbrir} className="flex w-full items-center gap-2 px-4 py-3 text-left">
-        {abierto ? <ChevronDown size={13} className="shrink-0 text-texto-3" /> : <ChevronRight size={13} className="shrink-0 text-texto-3" />}
+        {abierto ? (
+          <ChevronDown size={13} className="shrink-0 text-texto-3" />
+        ) : (
+          <ChevronRight size={13} className="shrink-0 text-texto-3" />
+        )}
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13px] font-bold">{e.nombre}</div>
           <div className="truncate text-[10px] text-texto-3">
@@ -200,11 +287,14 @@ function FilaEscenario({
             {e.norma ? ` · ${e.norma}` : ""}
           </div>
         </div>
-        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${CHIP[e.estado]}`}>{e.estado}</span>
+        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${CHIP[e.estado]}`}>
+          {e.estado}
+        </span>
       </button>
 
       {abierto && (
         <div className="border-t border-borde px-4 py-3">
+          <div className="mb-1.5 text-[10.5px] text-texto-2">Se armó con {resumenParametros(e.parametros)}.</div>
           <div className="text-[9.5px] font-bold tracking-wide text-texto-3 uppercase">Criterio (registro interno)</div>
           <p className="mt-0.5 text-[11.5px] leading-relaxed whitespace-pre-wrap">{e.criterio}</p>
           {e.aprobado_en && (
@@ -222,10 +312,28 @@ function FilaEscenario({
             </ul>
           )}
 
+          {limites.length > 0 && (
+            <div className="mt-3 rounded-xl border border-rosa/30 bg-rosa/5 p-2.5">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold tracking-wide text-rosa uppercase">
+                <Target size={11} /> Montos decididos por política
+              </div>
+              <div className="mt-1 space-y-0.5">
+                {limites.map((l) => (
+                  <div key={l.id} className="text-[10.5px] leading-snug">
+                    <b>{nombrePol.get(l.id) ?? l.id}</b>
+                    {l.piso != null && <> · al menos {pesos(l.piso, true)}</>}
+                    {l.tope != null && <> · como máximo {pesos(l.tope, true)}</>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {detalle && detalle.ajustes.length > 0 && (
             <div className="mt-3 rounded-xl border border-encurso/40 bg-encurso/5 p-2.5">
               <div className="flex items-center gap-1.5 text-[10px] font-bold tracking-wide text-encurso uppercase">
-                <TriangleAlert size={11} /> {detalle.ajustes.length} ajuste{detalle.ajustes.length === 1 ? "" : "s"} a mano sobre el criterio
+                <TriangleAlert size={11} /> {detalle.ajustes.length} ajuste{detalle.ajustes.length === 1 ? "" : "s"} a
+                mano sobre el criterio
               </div>
               <div className="mt-1 max-h-40 space-y-1 overflow-auto pr-1">
                 {detalle.ajustes.map((a) => (
@@ -242,7 +350,9 @@ function FilaEscenario({
           {detalle && (
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <div className="min-w-0">
-                <div className="text-[9.5px] font-bold tracking-wide text-texto-3 uppercase">Barrios que más reciben</div>
+                <div className="text-[9.5px] font-bold tracking-wide text-texto-3 uppercase">
+                  Barrios que más reciben
+                </div>
                 <div className="mt-1 max-h-48 space-y-0.5 overflow-auto pr-1">
                   {porBarrio.slice(0, 40).map(([b, m]) => (
                     <div key={b} className="flex justify-between gap-2 text-[11px]">
@@ -272,18 +382,43 @@ function FilaEscenario({
           )}
           {!detalle && !error && <p className="mt-2 text-[11px] text-texto-3">Cargando el detalle…</p>}
 
+          {detalle && (e.estado === "aprobado" || e.estado === "ejecutado") && (
+            <Seguimiento supabase={supabase} escenario={e.id} detalle={detalle} />
+          )}
+
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-borde pt-3">
-            <button onClick={exportar} disabled={!detalle} className="flex items-center gap-1 rounded-lg border border-borde-2 px-2.5 py-1.5 text-[11px] font-bold text-texto-2 hover:border-rosa/50 hover:text-rosa disabled:opacity-40">
+            <button
+              onClick={exportar}
+              disabled={!detalle}
+              className="flex items-center gap-1 rounded-lg border border-borde-2 px-2.5 py-1.5 text-[11px] font-bold text-texto-2 hover:border-rosa/50 hover:text-rosa disabled:opacity-40"
+            >
               <Download size={12} /> Asignación (CSV)
             </button>
-            <button onClick={exportarFinanciamiento} disabled={!detalle} className="flex items-center gap-1 rounded-lg border border-borde-2 px-2.5 py-1.5 text-[11px] font-bold text-texto-2 hover:border-rosa/50 hover:text-rosa disabled:opacity-40">
+            <button
+              onClick={exportarFinanciamiento}
+              disabled={!detalle}
+              className="flex items-center gap-1 rounded-lg border border-borde-2 px-2.5 py-1.5 text-[11px] font-bold text-texto-2 hover:border-rosa/50 hover:text-rosa disabled:opacity-40"
+            >
               <Download size={12} /> Financiamiento (CSV)
             </button>
+
+            <a
+              href={`/imprimir/presupuesto/${e.id}`}
+              target="_blank"
+              rel="noopener"
+              className="flex items-center gap-1 rounded-lg border border-rosa/40 px-2.5 py-1.5 text-[11px] font-bold text-rosa hover:bg-rosa/10"
+            >
+              <FileText size={12} /> Informe para la norma (PDF)
+            </a>
 
             <span className="flex-1" />
 
             {e.estado === "borrador" && (
-              <button onClick={() => void cambiar("propuesto")} disabled={ocupado} className="flex items-center gap-1 rounded-lg border border-encurso/50 px-2.5 py-1.5 text-[11px] font-bold text-encurso disabled:opacity-40">
+              <button
+                onClick={() => void cambiar("propuesto")}
+                disabled={ocupado}
+                className="flex items-center gap-1 rounded-lg border border-encurso/50 px-2.5 py-1.5 text-[11px] font-bold text-encurso disabled:opacity-40"
+              >
                 <Send size={12} /> Proponer
               </button>
             )}
@@ -294,7 +429,8 @@ function FilaEscenario({
                   setPidiendo({
                     estado: "aprobado",
                     titulo: "Norma que aprueba la asignación",
-                    ayuda: "La base vuelve a controlar el crédito libre de cada partida y rechaza la aprobación si alguna quedó excedida, si hay partidas estimadas, si la aprueba quien la armó o si hay cupos o programas y rige una veda.",
+                    ayuda:
+                      "La base vuelve a controlar el crédito libre de cada partida y rechaza la aprobación si alguna quedó excedida, si hay partidas estimadas, si la aprueba quien la armó o si hay cupos o programas y rige una veda.",
                   })
                 }
                 disabled={ocupado}
@@ -309,7 +445,8 @@ function FilaEscenario({
                   setPidiendo({
                     estado: "ejecutado",
                     titulo: "Expediente o norma de la ejecución",
-                    ayuda: "Marcalo recién cuando el gasto ya figure como comprometido en el reporte de la Contaduría: al pasar a ejecutado deja de reservar crédito.",
+                    ayuda:
+                      "Marcalo recién cuando el gasto ya figure como comprometido en el reporte de la Contaduría: al pasar a ejecutado deja de reservar crédito.",
                   })
                 }
                 disabled={ocupado}
@@ -322,7 +459,11 @@ function FilaEscenario({
               <button
                 onClick={() =>
                   e.estado === "aprobado"
-                    ? setPidiendo({ estado: "descartado", titulo: "Norma que anula la aprobación", ayuda: "La anulación queda sumada a la norma original." })
+                    ? setPidiendo({
+                        estado: "descartado",
+                        titulo: "Norma que anula la aprobación",
+                        ayuda: "La anulación queda sumada a la norma original.",
+                      })
                     : void cambiar("descartado")
                 }
                 disabled={ocupado}
@@ -332,7 +473,12 @@ function FilaEscenario({
               </button>
             )}
             {(e.estado === "borrador" || e.estado === "descartado") && nuncaPropuesto && (
-              <button onClick={() => void borrar()} disabled={ocupado} title="Borrar (solo lo que nunca se propuso)" className="text-texto-3 transition hover:text-peligro disabled:opacity-40">
+              <button
+                onClick={() => void borrar()}
+                disabled={ocupado}
+                title="Borrar (solo lo que nunca se propuso)"
+                className="text-texto-3 transition hover:text-peligro disabled:opacity-40"
+              >
                 <Trash2 size={13} />
               </button>
             )}
@@ -341,9 +487,20 @@ function FilaEscenario({
           {pidiendo && (
             <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-rosa/30 bg-rosa/5 p-2.5">
               <span className="text-[11px] font-bold">{pidiendo.titulo}</span>
-              <input autoFocus value={norma} onChange={(x) => setNorma(x.target.value)} placeholder="ej. Decreto Nº 1234/SEH/2026" className={`min-w-0 flex-1 ${campo}`} />
+              <input
+                autoFocus
+                value={norma}
+                onChange={(x) => setNorma(x.target.value)}
+                placeholder="ej. Decreto Nº 1234/SEH/2026"
+                className={`min-w-0 flex-1 ${campo}`}
+              />
               {pidiendo.estado === "aprobado" && (
-                <input value={boletin} onChange={(x) => setBoletin(x.target.value)} placeholder="Boletín Oficial (opcional)" className={`w-44 ${campo}`} />
+                <input
+                  value={boletin}
+                  onChange={(x) => setBoletin(x.target.value)}
+                  placeholder="Boletín Oficial (opcional)"
+                  className={`w-44 ${campo}`}
+                />
               )}
               <button
                 onClick={() => void cambiar(pidiendo.estado, norma, boletin)}
@@ -383,6 +540,7 @@ function Bitacora({ supabase }: { supabase: SupabaseClient }) {
     presupuesto_vedas: "veda",
     presupuesto_habilitados: "acceso",
     escenario_ajustes: "ajuste manual",
+    escenario_ejecucion: "seguimiento",
   };
   const ACCION: Record<string, string> = { INSERT: "alta", UPDATE: "cambio", DELETE: "baja" };
 
@@ -444,11 +602,14 @@ function Accesos({ supabase }: { supabase: SupabaseClient }) {
   return (
     <div className="panel-vidrio rounded-2xl p-3">
       <p className="mb-2 text-[10.5px] leading-snug text-texto-3">
-        Tener usuario en el comando no da acceso al presupuesto. Habilitá solo a quien trabaja en la planificación del gasto
-        municipal. El superadmin siempre tiene acceso.
+        Tener usuario en el comando no da acceso al presupuesto. Habilitá solo a quien trabaja en la planificación del
+        gasto municipal. El superadmin siempre tiene acceso.
       </p>
       {lista.map((a) => (
-        <label key={a.perfil_id} className="flex items-center gap-2 border-b border-borde/60 py-1.5 text-[11px] last:border-0">
+        <label
+          key={a.perfil_id}
+          className="flex items-center gap-2 border-b border-borde/60 py-1.5 text-[11px] last:border-0"
+        >
           <input
             type="checkbox"
             checked={a.habilitado}

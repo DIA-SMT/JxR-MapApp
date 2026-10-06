@@ -588,6 +588,40 @@ export interface ParametrosAsignacion {
   politicas?: number[];
   /** Montos bloqueados a mano: clave `${politicaId}|${barrioId}`. */
   fijos?: Record<string, number>;
+  /** Montos decididos por política al repartir: pisan el piso y el tope del catálogo. */
+  limites?: Limites;
+}
+
+/** Por política: al menos (piso) y como máximo (tope), en pesos. */
+export type Limites = Record<number, { piso?: number; tope?: number }>;
+
+/**
+ * Lee lo que se escribió en «al menos» y «como máximo» (clave `${id}|piso` o
+ * `${id}|tope`). Una política con un monto que no se entiende, o con el piso
+ * por encima del tope, queda en `invalidas` y no se aplica: mejor no aplicar
+ * nada que aplicar la mitad de lo que se quiso decir.
+ */
+export function leerLimites(texto: Record<string, string>): { limites: Limites; invalidas: Set<number> } {
+  const limites: Limites = {};
+  const invalidas = new Set<number>();
+  for (const [clave, valor] of Object.entries(texto)) {
+    const [idTxt, campo] = clave.split("|");
+    const id = Number(idTxt);
+    const txt = valor.trim();
+    if (!Number.isInteger(id) || (campo !== "piso" && campo !== "tope") || !txt) continue;
+    const n = parsearImporte(txt);
+    if (!(Number.isFinite(n) && n >= 0)) {
+      invalidas.add(id);
+      continue;
+    }
+    (limites[id] ??= {})[campo] = n;
+  }
+  for (const [idTxt, l] of Object.entries(limites)) {
+    const id = Number(idTxt);
+    if (l.piso != null && l.tope != null && l.piso > l.tope) invalidas.add(id);
+  }
+  for (const id of invalidas) delete limites[id];
+  return { limites, invalidas };
 }
 
 export interface Entradas {
@@ -668,8 +702,9 @@ export function armarEntradas(
       prioridad: prioridad * pol.costo_unitario,
       // los pisos que compiten se ordenan por la prioridad del planificador, sin escalar
       orden: prioridad,
-      piso: pol.piso ?? undefined,
-      tope: pol.tope ?? undefined,
+      // lo decidido al repartir manda sobre el catálogo, campo por campo
+      piso: parametros.limites?.[pol.id]?.piso ?? pol.piso ?? undefined,
+      tope: parametros.limites?.[pol.id]?.tope ?? pol.tope ?? undefined,
     });
 
     for (const b of barriosUsados) {
@@ -691,4 +726,61 @@ export function armarEntradas(
   }
 
   return { fuentes, politicas: entradaPoliticas, necesidades, excluidas };
+}
+
+// ── Formato y criterios (los comparten la herramienta y el informe impreso) ──
+
+/** $ 1.234.567 o, compacto, $ 1.234,6 M. */
+export function pesos(n: number, compacto = false): string {
+  if (compacto && Math.abs(n) >= 1e6) {
+    return `$ ${(n / 1e6).toLocaleString("es-AR", { maximumFractionDigits: Math.abs(n) >= 1e9 ? 0 : 1 })} M`;
+  }
+  // «|| 0» evita el «$ -0» de redondear un negativo chico
+  return `$ ${(Math.round(n) || 0).toLocaleString("es-AR")}`;
+}
+
+/**
+ * Los tres criterios que se ofrecen, en lenguaje llano. Cada uno es una
+ * combinación de los dos parámetros del motor: cuánto pesa que la necesidad
+ * esté concentrada (intensidad) y cuánto se reparte entre barrios (equidad).
+ */
+export const CRITERIOS = [
+  {
+    clave: "necesidad",
+    titulo: "Donde más se necesita",
+    texto: "Concentra la plata en los barrios con más necesidad que el promedio de la ciudad.",
+    intensidad: 2,
+    equidad: 0.5,
+  },
+  {
+    clave: "equilibrado",
+    titulo: "Equilibrado",
+    texto: "Prioriza la necesidad, pero sin dejar afuera a los barrios con necesidad media.",
+    intensidad: 1,
+    equidad: 1,
+  },
+  {
+    clave: "alcance",
+    titulo: "Llegar a más barrios",
+    texto: "Reparte para que la mayor cantidad de barrios reciba algo, aunque sea menos.",
+    intensidad: 0.5,
+    equidad: 3,
+  },
+] as const;
+
+/** Con qué se armó una propuesta, en una línea: el criterio y los montos decididos a mano. */
+export function resumenParametros(p: Record<string, unknown>): string {
+  const i = Number(p.intensidad);
+  const e = Number(p.equidad);
+  const c = CRITERIOS.find((x) => x.intensidad === i && x.equidad === e);
+  const partes = [
+    c
+      ? `criterio «${c.titulo}»`
+      : Number.isFinite(i) && Number.isFinite(e)
+        ? "criterio personalizado"
+        : "criterio sin registrar",
+  ];
+  const lim = p.limites && typeof p.limites === "object" ? Object.keys(p.limites).length : 0;
+  if (lim > 0) partes.push(`${lim} política${lim === 1 ? "" : "s"} con monto decidido`);
+  return partes.join(" · ");
 }

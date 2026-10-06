@@ -4,6 +4,7 @@ import { asignarPresupuesto } from "./asignacion.ts";
 import {
   armarEntradas,
   inferirClase,
+  leerLimites,
   leerPartidas,
   libreAsignable,
   normalizarAfectacion,
@@ -282,4 +283,37 @@ test("plural: unidades de las políticas", () => {
 test("pct: coma decimal", () => {
   assert.equal(pct(22.44), "22,4%");
   assert.equal(pct(NaN), "0,0%");
+});
+
+test("leerLimites: al menos y como máximo por política", () => {
+  const { limites, invalidas } = leerLimites({
+    "3|piso": "100.000.000",
+    "3|tope": "250.000.000",
+    "4|tope": "0",
+    "5|piso": "abc",
+    "6|piso": "10",
+    "6|tope": "5",
+    "7|piso": "  ",
+  });
+  assert.deepEqual(limites, { 3: { piso: 100_000_000, tope: 250_000_000 }, 4: { tope: 0 } });
+  assert.deepEqual([...invalidas].sort(), [5, 6]);
+});
+
+test("armarEntradas: el monto decidido al repartir pisa al catálogo", () => {
+  const partidas: Partida[] = [
+    { id: 1, codigo: "A", anexo: "", jurisdiccion: "", programa: "", clase: "capital", partida_principal: "52", afectacion: "", credito_vigente: 1000, comprometido: 0 },
+  ];
+  const pol = {
+    id: 9, codigo: "1.1", nombre: "Obra", tipo: "obra", clase: "capital", partidas_principales: ["52"], afectaciones: [],
+    indicador: "sin_cloaca", costo_unitario: 10, prioridad: 1, piso: 50, tope: 500, activa: true,
+  } as unknown as Politica;
+  const barrios: BarrioNecesidad[] = [
+    { id: "X", nombre: "X", poblacion: 100, hogares: 40, indicadores: { sin_cloaca: 20 } } as unknown as BarrioNecesidad,
+  ];
+  const sin = armarEntradas(partidas, [pol], barrios, { intensidad: 1, equidad: 1 });
+  assert.equal(sin.politicas[0].piso, 50);
+  assert.equal(sin.politicas[0].tope, 500);
+  const con = armarEntradas(partidas, [pol], barrios, { intensidad: 1, equidad: 1, limites: { 9: { tope: 120 } } });
+  assert.equal(con.politicas[0].piso, 50, "el piso del catálogo sigue");
+  assert.equal(con.politicas[0].tope, 120);
 });

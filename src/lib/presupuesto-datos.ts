@@ -452,3 +452,75 @@ export async function habilitarAcceso(supabase: SupabaseClient, perfil: string, 
   const { error } = await supabase.rpc("presupuesto_habilitar", { p_perfil: perfil, p_habilitar: habilitar });
   return error ? error.message : null;
 }
+
+// ── Seguimiento de la ejecución (migración 0017) ───────────────────────────
+
+export type EstadoEjecucion = "pendiente" | "en_curso" | "terminado" | "no_se_hara";
+
+export interface FilaEjecucion {
+  politica_id: number;
+  barrio: string;
+  estado: EstadoEjecucion;
+  monto_ejecutado: number;
+  unidades_logradas: number;
+  expediente: string;
+  nota: string;
+  actualizado_email: string;
+  actualizado_en: string | null;
+}
+
+/** Avisa con un mensaje claro si la base todavía no tiene la migración 0017. */
+export class SinSeguimiento extends Error {}
+
+export async function obtenerEjecucion(supabase: SupabaseClient, escenario: number): Promise<FilaEjecucion[]> {
+  const out: FilaEjecucion[] = [];
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await supabase
+      .from("escenario_ejecucion")
+      .select("*")
+      .eq("escenario_id", escenario)
+      .order("politica_id")
+      .order("barrio")
+      .range(desde, desde + 999);
+    if (error) {
+      if (error.code === "42P01" || error.code === "PGRST205")
+        throw new SinSeguimiento("El seguimiento todavía no está activado en la base (falta la migración 0017).");
+      throw new Error(error.message);
+    }
+    for (const f of data ?? []) {
+      out.push({
+        politica_id: Number(f.politica_id),
+        barrio: String(f.barrio),
+        estado: f.estado as EstadoEjecucion,
+        monto_ejecutado: num(f.monto_ejecutado),
+        unidades_logradas: num(f.unidades_logradas),
+        expediente: String(f.expediente ?? ""),
+        nota: String(f.nota ?? ""),
+        actualizado_email: String(f.actualizado_email ?? ""),
+        actualizado_en: f.actualizado_en ? String(f.actualizado_en) : null,
+      });
+    }
+    if (!data || data.length < 1000) return out;
+  }
+}
+
+export async function registrarEjecucion(
+  supabase: SupabaseClient,
+  escenario: number,
+  filas: Array<Omit<FilaEjecucion, "actualizado_email" | "actualizado_en">>,
+): Promise<string | null> {
+  const { error } = await supabase.rpc("registrar_ejecucion", {
+    p_escenario: escenario,
+    p_items: filas.map((f) => ({
+      politica_id: f.politica_id,
+      barrio: f.barrio,
+      estado: f.estado,
+      monto_ejecutado: Math.round(f.monto_ejecutado * 100) / 100,
+      unidades_logradas: f.unidades_logradas,
+      expediente: f.expediente,
+      nota: f.nota,
+    })),
+  });
+  if (error?.code === "PGRST202") return "El seguimiento todavía no está activado en la base (falta la migración 0017).";
+  return error ? error.message : null;
+}
