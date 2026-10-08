@@ -19,6 +19,8 @@ interface Mensaje {
   accionMapa?: AccionMapa;
   /** Acciones avanzadas: resaltar circuitos, pintar una métrica, marcar un barrio. */
   accionesMapa?: AccionMapaElena[];
+  /** Un aviso de que algo falló: se muestra, pero no vuelve a viajar como conversación. */
+  error?: boolean;
 }
 
 /** Render mínimo: **texto** → negrita real (sin librerías de markdown). */
@@ -102,7 +104,13 @@ export function ElenaChat() {
       const res = await fetch("/api/elena", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ mensajes: nuevos.map(({ rol, contenido }) => ({ rol, contenido })) }),
+        // solo lo último y sin los avisos de error: la conversación entera puede ser enorme
+        body: JSON.stringify({
+          mensajes: nuevos
+            .filter((m) => !m.error)
+            .slice(-12)
+            .map(({ rol, contenido }) => ({ rol, contenido: contenido.slice(0, 4000) })),
+        }),
       });
       const data = (await res.json()) as {
         respuesta?: string;
@@ -116,6 +124,7 @@ export function ElenaChat() {
         {
           rol: "elena",
           contenido: data.respuesta ?? `Perdón, tuve un problema: ${data.error ?? "error desconocido"}. Probá de nuevo.`,
+          error: data.respuesta == null,
           herramientas: data.herramientas,
           accionMapa: data.accionMapa,
           accionesMapa: data.accionesMapa,
@@ -124,7 +133,7 @@ export function ElenaChat() {
       if (data.accionesMapa && data.accionesMapa.length > 0) accionarMapaAvanzado(data.accionesMapa);
       else if (data.accionMapa) accionarMapa(data.accionMapa);
     } catch {
-      setMensajes((m) => [...m, { rol: "elena", contenido: "Se me cortó la conexión. ¿Probás de nuevo?" }]);
+      setMensajes((m) => [...m, { rol: "elena", contenido: "Se me cortó la conexión. ¿Probás de nuevo?", error: true }]);
     } finally {
       setPensando(false);
     }
