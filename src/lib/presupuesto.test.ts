@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { asignarPresupuesto } from "./asignacion.ts";
 import {
   armarEntradas,
+  demandasDeBarrio,
   inferirClase,
   leerLimites,
   leerPartidas,
@@ -316,4 +317,18 @@ test("armarEntradas: el monto decidido al repartir pisa al catálogo", () => {
   const con = armarEntradas(partidas, [pol], barrios, { intensidad: 1, equidad: 1, limites: { 9: { tope: 120 } } });
   assert.equal(con.politicas[0].piso, 50, "el piso del catálogo sigue");
   assert.equal(con.politicas[0].tope, 120);
+});
+
+test("demandasDeBarrio: lo que supera a la ciudad, de más a menos", () => {
+  const b = (id: string, hogares: number, ind: Record<string, number>) =>
+    ({ id, nombre: id, poblacion: hogares * 3, hogares, indicadores: ind }) as BarrioNecesidad;
+  const barrios = [
+    b("Norte", 100, { nbi: 40, sin_cloaca: 12, hacinamiento: 5 }),
+    b("Sur", 900, { nbi: 60, sin_cloaca: 100, hacinamiento: 90 }),
+  ];
+  const d = demandasDeBarrio(barrios[0], barrios);
+  // NBI: 40 % contra 10 % de la ciudad (4 veces); cloaca 12 % contra 11,2 %; hacinamiento 5 casos < mínimo
+  assert.deepEqual(d.map((x) => x.indicador), ["nbi", "sin_cloaca"]);
+  assert.equal(Math.round(d[0].veces * 10) / 10, 4);
+  assert.deepEqual(demandasDeBarrio(barrios[1], barrios).map((x) => x.indicador), ["hacinamiento"]);
 });

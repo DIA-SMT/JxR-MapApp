@@ -36,6 +36,7 @@ import { Vacio } from "@/components/ui/vacio";
 import { pesos, resumenParametros } from "./asignar";
 import { Comparar } from "./comparar";
 import { Seguimiento } from "./seguimiento";
+import { PorArea } from "./areas";
 import type { DatosPresupuesto } from "./panel";
 
 const CHIP: Record<EstadoEscenario, string> = {
@@ -381,6 +382,18 @@ function FilaEscenario({
             </div>
           )}
           {!detalle && !error && <p className="mt-2 text-[11px] text-texto-3">Cargando el detalle…</p>}
+
+          {detalle && (
+            <PorArea
+              archivo={`propuesta-${e.id}-por-area.csv`}
+              filas={detalle.asignaciones.map((a) => ({
+                codigo: a.politica_codigo,
+                nombre: a.politica_nombre,
+                barrio: a.barrio,
+                monto: a.monto,
+              }))}
+            />
+          )}
 
           {detalle && (e.estado === "aprobado" || e.estado === "ejecutado") && (
             <Seguimiento supabase={supabase} escenario={e.id} detalle={detalle} />

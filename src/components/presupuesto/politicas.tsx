@@ -14,6 +14,8 @@ import {
 import { guardarPolitica, type PoliticaCatalogo } from "@/lib/presupuesto-datos";
 import { Vacio } from "@/components/ui/vacio";
 import { pesos } from "./asignar";
+import { AreasDePolitica, OrganigramaVista } from "./areas";
+import { areasDePolitica } from "@/lib/organigrama";
 import type { DatosPresupuesto } from "./panel";
 
 const TIPOS: Array<[TipoPolitica | "institucional", string]> = [
@@ -44,6 +46,7 @@ export function Politicas({
   const [filtro, setFiltro] = useState<Filtro>("listas");
   const [q, setQ] = useState("");
   const [abierta, setAbierta] = useState<number | null>(null);
+  const [porArea, setPorArea] = useState(false);
 
   const necesidadCiudad = useMemo(() => {
     const out: Record<string, number> = {};
@@ -58,7 +61,8 @@ export function Politicas({
       if (filtro === "listas" && !lista) return false;
       if (filtro === "faltan" && (lista || !p.activa)) return false;
       if (!texto) return true;
-      return `${p.codigo} ${p.nombre} ${p.eje} ${p.secretaria}`
+      const { lidera, participan } = areasDePolitica(p.codigo);
+      return `${p.codigo} ${p.nombre} ${p.eje} ${p.secretaria} ${lidera?.nombre ?? ""} ${participan.map((x) => x.nombre).join(" ")}`
         .normalize("NFD")
         .replace(/[̀-ͯ]/g, "")
         .toLowerCase()
@@ -105,7 +109,7 @@ export function Politicas({
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Código, nombre, eje o secretaría…"
+            placeholder="Código, nombre, eje o área…"
             className="w-full bg-transparent text-xs outline-none placeholder:text-texto-3"
           />
         </div>
@@ -128,36 +132,60 @@ export function Politicas({
         </div>
       </div>
 
-      <p className="px-1 text-[10.5px] leading-snug text-texto-3">
-        Las 63 líneas estratégicas del Plan Rector 2023-2030. El documento no numera las líneas: el código es el eje y
-        el orden de aparición (el 4.1 del catálogo es la primera línea del eje 4, no el objetivo 4.1 del documento).
-      </p>
-
-      {conteo.listas === 0 && filtro === "listas" && (
-        <Vacio icono={ListChecks} titulo="Ninguna política está lista para asignar" variante="filtro">
-          Las líneas del Plan Rector vienen cargadas sin costo por unidad: ese número lo tiene cada secretaría. Pasá a
-          «Les falta un dato» y completalo.
-        </Vacio>
-      )}
-
-      <div className="space-y-1.5">
-        {lista.map((p) => (
-          <FilaPolitica
-            key={p.id}
-            p={p}
-            datos={datos}
-            necesidadCiudad={necesidadCiudad}
-            abierta={abierta === p.id}
-            onAbrir={() => setAbierta(abierta === p.id ? null : p.id)}
-            puedeEditar={esSuperadmin}
-            onGuardar={async (cambios) => {
-              const e = await guardarPolitica(supabase, p.id, cambios);
-              if (!e) await onCambio();
-              return e;
-            }}
-          />
+      <div className="flex overflow-hidden rounded-xl border border-borde-2 text-[11px] font-bold sm:w-fit">
+        {(
+          [
+            [false, "Lista de políticas"],
+            [true, "Por área del organigrama"],
+          ] as Array<[boolean, string]>
+        ).map(([v, t]) => (
+          <button
+            key={t}
+            onClick={() => setPorArea(v)}
+            className={`flex-1 px-3 py-2 transition ${porArea === v ? "bg-celeste/20 text-celeste" : "text-texto-3 hover:text-texto"}`}
+          >
+            {t}
+          </button>
         ))}
       </div>
+
+      {porArea ? (
+        <OrganigramaVista politicas={datos.politicas} />
+      ) : (
+        <>
+          <p className="px-1 text-[10.5px] leading-snug text-texto-3">
+            Las 63 líneas estratégicas del Plan Rector 2023-2030. El documento no numera las líneas: el código es el eje
+            y el orden de aparición (el 4.1 del catálogo es la primera línea del eje 4, no el objetivo 4.1 del
+            documento).
+          </p>
+
+          {conteo.listas === 0 && filtro === "listas" && (
+            <Vacio icono={ListChecks} titulo="Ninguna política está lista para asignar" variante="filtro">
+              Las líneas del Plan Rector vienen cargadas sin costo por unidad: ese número lo tiene cada secretaría. Pasá
+              a «Les falta un dato» y completalo.
+            </Vacio>
+          )}
+
+          <div className="space-y-1.5">
+            {lista.map((p) => (
+              <FilaPolitica
+                key={p.id}
+                p={p}
+                datos={datos}
+                necesidadCiudad={necesidadCiudad}
+                abierta={abierta === p.id}
+                onAbrir={() => setAbierta(abierta === p.id ? null : p.id)}
+                puedeEditar={esSuperadmin}
+                onGuardar={async (cambios) => {
+                  const e = await guardarPolitica(supabase, p.id, cambios);
+                  if (!e) await onCambio();
+                  return e;
+                }}
+              />
+            ))}
+          </div>
+        </>
+      )}
       {!esSuperadmin && <p className="px-1 text-[11px] text-texto-3">El catálogo lo edita el superadmin.</p>}
     </div>
   );
@@ -254,9 +282,9 @@ function FilaPolitica({
         <span className="num w-10 shrink-0 text-[11px] font-bold text-texto-3">{p.codigo}</span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[12px] font-bold">{p.nombre}</div>
-          <div className="truncate text-[10px] text-texto-3">
-            {p.eje}
-            {p.secretaria ? ` · ${p.secretaria}` : ""}
+          <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-[10px] text-texto-3">
+            <span className="truncate">{p.eje}</span>
+            <AreasDePolitica codigo={p.codigo} compacto />
           </div>
         </div>
         <span className="hidden shrink-0 text-right text-[10px] text-texto-2 sm:block">

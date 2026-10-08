@@ -15,6 +15,8 @@ import {
 } from "@/lib/presupuesto-datos";
 import { pesos, plural, resumenParametros } from "@/lib/presupuesto";
 import { MapaImpreso } from "./mapa-impreso";
+import { agruparPorArea } from "./areas";
+import { areasDePolitica } from "@/lib/organigrama";
 
 const TIPO: Record<string, string> = {
   obra: "Obra",
@@ -262,7 +264,7 @@ export function InformePresupuesto({ id }: { id: number }) {
             <thead>
               <tr className="border-b border-neutral-300">
                 <th className={th}>Política</th>
-                <th className={th}>Tipo</th>
+                <th className={th}>Lidera</th>
                 <th className={`${th} text-right`}>Monto</th>
                 <th className={`${th} text-right`}>%</th>
                 <th className={`${th} text-right`}>Qué se logra</th>
@@ -275,7 +277,10 @@ export function InformePresupuesto({ id }: { id: number }) {
                   <td className={td}>
                     <span className="text-neutral-500">{p.codigo}</span> {p.nombre}
                   </td>
-                  <td className={`${td} text-neutral-600`}>{TIPO[p.tipo] ?? p.tipo}</td>
+                  <td className={`${td} text-neutral-600`}>
+                    {areasDePolitica(p.codigo).lidera?.nombre ?? "—"}
+                    <div className="text-[9px] text-neutral-400">{TIPO[p.tipo] ?? p.tipo}</div>
+                  </td>
                   <td className={`${td} text-right font-bold`}>{pesos(p.monto)}</td>
                   <td className={`${td} text-right`}>
                     {total > 0 ? ((100 * p.monto) / total).toLocaleString("es-AR", { maximumFractionDigits: 1 }) : 0}%
@@ -296,6 +301,46 @@ export function InformePresupuesto({ id }: { id: number }) {
               </tr>
             </tbody>
           </table>
+
+          {/* Coordinación entre áreas */}
+          <div className={seccion}>Áreas que intervienen</div>
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-neutral-300">
+                <th className={th}>Área que lidera</th>
+                <th className={`${th} text-right`}>Monto</th>
+                <th className={`${th} text-right`}>Barrios</th>
+                <th className={th}>Coordina con</th>
+              </tr>
+            </thead>
+            <tbody>
+              {agruparPorArea(
+                det.asignaciones.map((x) => ({
+                  codigo: x.politica_codigo,
+                  nombre: x.politica_nombre,
+                  barrio: x.barrio,
+                  monto: x.monto,
+                })),
+              ).map((g) => (
+                <tr key={g.area.id} className="border-b border-neutral-100 break-inside-avoid">
+                  <td className={td}>
+                    <span className="font-semibold">{g.area.nombre}</span>
+                    <div className="text-[9px] text-neutral-500">
+                      {g.secretaria.nombre}
+                      {g.area.responsable ? ` · ${g.area.responsable}` : ""}
+                    </div>
+                  </td>
+                  <td className={`${td} text-right font-bold`}>{pesos(g.monto)}</td>
+                  <td className={`${td} text-right`}>{g.barrios}</td>
+                  <td className={`${td} text-neutral-600`}>{g.participan.map((x) => x.nombre).join(" · ") || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-1 text-[9px] text-neutral-500">
+            Áreas según el organigrama municipal vigente. La asignación de áreas a cada línea del Plan Rector es una
+            propuesta de trabajo a validar con cada secretaría.
+          </p>
 
           {/* Financiamiento */}
           <div className={seccion}>Financiamiento (Ord. de Contabilidad 570/80)</div>

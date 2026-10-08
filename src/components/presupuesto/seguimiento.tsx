@@ -15,6 +15,7 @@ import { parsearImporte, pct, plural } from "@/lib/presupuesto";
 import { descargarCSV } from "@/lib/csv";
 import { pesos } from "./asignar";
 import { MapaBarrios } from "./mapa-barrios";
+import { AREA, AREAS_POLITICA, nombreCorto } from "@/lib/organigrama";
 
 export const ESTADOS_EJECUCION: Record<EstadoEjecucion, { texto: string; clase: string }> = {
   pendiente: { texto: "Pendiente", clase: "text-texto-3" },
@@ -47,6 +48,7 @@ export function Seguimiento({
   const [sinTabla, setSinTabla] = useState<string | null>(null);
   const [borrador, setBorrador] = useState<Record<string, Borrador>>({});
   const [politica, setPolitica] = useState<number | "todas">("todas");
+  const [area, setArea] = useState<string>("todas");
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoEjecucion | "todos">("todos");
   const [busqueda, setBusqueda] = useState("");
   const [cuantas, setCuantas] = useState(POR_PAGINA);
@@ -132,10 +134,11 @@ export function Seguimiento({
     const q = busqueda.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
     return celdas
       .filter((c) => politica === "todas" || c.a.politica_id === politica)
+      .filter((c) => area === "todas" || AREAS_POLITICA[c.a.politica_codigo]?.lidera === area)
       .filter((c) => estadoFiltro === "todos" || (borrador[c.k]?.estado ?? c.estado) === estadoFiltro)
       .filter((c) => !q || c.a.barrio.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().includes(q))
       .sort((x, y) => y.a.monto - x.a.monto);
-  }, [celdas, politica, estadoFiltro, busqueda, borrador]);
+  }, [celdas, politica, area, estadoFiltro, busqueda, borrador]);
 
   const editar = (c: (typeof celdas)[number], cambio: Partial<Borrador>) =>
     setBorrador((b) => {
@@ -180,19 +183,18 @@ export function Seguimiento({
     const e = await registrarEjecucion(
       supabase,
       escenario,
-      enviadas
-        .map((c) => {
-          const b = borrador[c.k];
-          return {
-            politica_id: c.a.politica_id,
-            barrio: c.a.barrio,
-            estado: b.estado,
-            monto_ejecutado: b.monto.trim() ? parsearImporte(b.monto) : 0,
-            unidades_logradas: b.unidades.trim() ? parsearImporte(b.unidades) : 0,
-            expediente: b.expediente.trim(),
-            nota: b.nota.trim(),
-          };
-        }),
+      enviadas.map((c) => {
+        const b = borrador[c.k];
+        return {
+          politica_id: c.a.politica_id,
+          barrio: c.a.barrio,
+          estado: b.estado,
+          monto_ejecutado: b.monto.trim() ? parsearImporte(b.monto) : 0,
+          unidades_logradas: b.unidades.trim() ? parsearImporte(b.unidades) : 0,
+          expediente: b.expediente.trim(),
+          nota: b.nota.trim(),
+        };
+      }),
     );
     setOcupado(false);
     if (e) return setMsj({ ok: false, t: e });
@@ -341,6 +343,29 @@ export function Seguimiento({
                 {p.nombre}
               </option>
             ))}
+          </select>
+          <select
+            value={area}
+            onChange={(e) => {
+              setArea(e.target.value);
+              setCuantas(POR_PAGINA);
+            }}
+            title="Cada área carga el avance de lo que lidera"
+            className="max-w-56 rounded-md border border-borde-2 bg-panel px-1.5 py-1 text-[10.5px] outline-none"
+          >
+            <option value="todas">Todas las áreas</option>
+            {[
+              ...new Set(
+                celdas.map((c) => AREAS_POLITICA[c.a.politica_codigo]?.lidera).filter((x): x is string => !!x),
+              ),
+            ]
+              .map((id) => AREA.get(id)!)
+              .sort((x, y) => x.nombre.localeCompare(y.nombre))
+              .map((x) => (
+                <option key={x.id} value={x.id}>
+                  {nombreCorto(x)}
+                </option>
+              ))}
           </select>
           <select
             value={estadoFiltro}

@@ -208,6 +208,48 @@ export function baseDe(b: BarrioNecesidad, base: BaseIndicador): number {
   return b.poblacion;
 }
 
+/** Indicadores de carencia: los que definen una demanda (la edad es perfil, no carencia). */
+export const CARENCIAS = ["nbi", "privacion", "hacinamiento", "clima_educativo_bajo", "sin_cloaca", "sin_agua_red", "desocupados", "sin_cobertura_salud"];
+
+export interface DemandaBarrio {
+  indicador: string;
+  etiqueta: string;
+  /** Casos en el barrio (hogares o personas). */
+  casos: number;
+  /** % sobre su base en el barrio y en la ciudad. */
+  tasa: number;
+  tasaCiudad: number;
+  /** Cuántas veces la tasa de la ciudad. */
+  veces: number;
+}
+
+/**
+ * Las principales demandas de un barrio: las carencias del censo cuya tasa
+ * supera la de la ciudad, de la más a la menos marcada. Con `minCasos` se
+ * descartan los barrios donde 2 hogares sobre 5 hacen un 40 % engañoso.
+ */
+export function demandasDeBarrio(
+  barrio: BarrioNecesidad,
+  barrios: BarrioNecesidad[],
+  { minCasos = 10, limite = 4 }: { minCasos?: number; limite?: number } = {},
+): DemandaBarrio[] {
+  const out: DemandaBarrio[] = [];
+  for (const ind of CARENCIAS) {
+    const info = INDICADORES[ind];
+    if (!info) continue;
+    const casos = barrio.indicadores[ind] ?? 0;
+    const base = baseDe(barrio, info.base);
+    const totCasos = barrios.reduce((x, b) => x + (b.indicadores[ind] ?? 0), 0);
+    const totBase = barrios.reduce((x, b) => x + baseDe(b, info.base), 0);
+    if (casos < minCasos || base <= 0 || totBase <= 0 || totCasos <= 0) continue;
+    const tasa = (100 * casos) / base;
+    const tasaCiudad = (100 * totCasos) / totBase;
+    if (tasa <= tasaCiudad) continue;
+    out.push({ indicador: ind, etiqueta: info.etiqueta, casos, tasa, tasaCiudad, veces: tasa / tasaCiudad });
+  }
+  return out.sort((a, b) => b.veces - a.veces).slice(0, limite);
+}
+
 // ── Lectura de montos y del reporte de partidas ────────────────────────────
 
 /**

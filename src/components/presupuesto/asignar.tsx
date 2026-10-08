@@ -33,6 +33,7 @@ import { MapaBarrios } from "./mapa-barrios";
 import { CRITERIOS, pesos } from "@/lib/presupuesto";
 export { pesos, resumenParametros } from "@/lib/presupuesto";
 import { MontosPorPolitica } from "./montos-politica";
+import { QuienInterviene } from "./areas";
 import type { DatosPresupuesto } from "./panel";
 
 const numero = (n: number) => Math.round(n).toLocaleString("es-AR");
@@ -643,6 +644,17 @@ export function Asignar({
                     }))
               }
               onCerrar={() => setBarrio(null)}
+            />
+          )}
+          {seleccion && (
+            <QuienInterviene
+              barrio={seleccion}
+              barrios={datos.barrios}
+              politicas={datos.politicas}
+              asignaciones={asignacionesBarrio.map((x) => ({
+                codigo: polPorId.get(x.politica)?.codigo ?? "",
+                monto: x.monto,
+              }))}
             />
           )}
         </div>
