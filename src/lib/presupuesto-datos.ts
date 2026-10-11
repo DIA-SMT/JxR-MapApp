@@ -453,6 +453,8 @@ export const enPropuesta = (m: string) =>
     // y que concuerde el género
     .replace(/propuesta aprobado/g, "propuesta aprobada")
     .replace(/propuesta como ejecutado/g, "propuesta como ejecutada")
+    .replace(/propuesta (ejecutad|descartad|aprobad)o\b/g, "propuesta $1a")
+    .replace(/propuesta propuesto\b/g, "propuesta ya enviada")
     .replace(/propuesta no lo aprueba/g, "propuesta no la aprueba")
     .replace(/volvé a calcularlo y guardarlo/g, "volvé a calcularla y guardarla");
 

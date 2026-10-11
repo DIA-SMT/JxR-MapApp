@@ -137,7 +137,11 @@ export function Asignar({
         for (const a of d.asignaciones) m.set(a.barrio, (m.get(a.barrio) ?? 0) + a.monto);
         setComparada(m);
       })
-      .catch(() => vivo && setCompararId(null));
+      .catch(() => {
+        if (!vivo) return;
+        setCompararId(null);
+        setVista("total");
+      });
     return () => {
       vivo = false;
     };
@@ -269,8 +273,8 @@ export function Asignar({
 
   const valoresMapa = useMemo(() => {
     const out: Record<string, number> = {};
-    if (vista === "diferencia") {
-      for (const d of diferencias ?? []) out[d.id] = d.dif;
+    if (vista === "diferencia" && diferencias) {
+      for (const d of diferencias) out[d.id] = d.dif;
       return out;
     }
     for (const [b, x] of porBarrio) {
@@ -724,8 +728,8 @@ export function Asignar({
           </div>
           <MapaBarrios
             valores={valoresMapa}
-            divergente={vista === "diferencia"}
-            formatear={(v) => (vista === "diferencia" ? conSigno(v) : pesos(v, vista === "total"))}
+            divergente={vista === "diferencia" && !!diferencias}
+            formatear={(v) => (vista === "diferencia" && diferencias ? conSigno(v) : pesos(v, vista !== "hogar"))}
             etiqueta={vista === "total" ? "Asignado" : vista === "hogar" ? "Asignado por hogar" : "Ahora − guardada"}
             seleccionado={barrio}
             onSeleccionar={setBarrio}

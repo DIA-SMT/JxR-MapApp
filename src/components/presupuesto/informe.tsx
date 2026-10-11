@@ -218,7 +218,8 @@ export function InformePresupuesto({ id, ejemplo = false }: { id: number; ejempl
 
           {ejemplo && (
             <div className="mt-3 rounded border-2 border-dashed border-neutral-500 px-3 py-2 text-center text-[11px] font-bold tracking-wide text-neutral-700 uppercase">
-              Ejemplo con montos y costos inventados · solo para conocer la herramienta
+              Ejemplo con montos y costos inventados · solo para conocer la herramienta · el avance que se cargue en la
+              pantalla no se guarda y no aparece acá
             </div>
           )}
           {!oficial && !ejemplo && (

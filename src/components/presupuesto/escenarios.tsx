@@ -117,7 +117,16 @@ function requisitosAprobacion(
       detalle.asignaciones
         .filter((a) => {
           const p = pol.get(a.politica_id);
-          return !p || !p.activa || Math.abs((p.costo_unitario ?? 0) - a.costo_unitario) > 0.005;
+          return (
+            !p ||
+            !p.activa ||
+            p.tipo === "institucional" ||
+            Math.abs((p.costo_unitario ?? 0) - a.costo_unitario) > 0.005 ||
+            p.codigo !== a.politica_codigo ||
+            p.nombre !== a.politica_nombre ||
+            p.tipo !== a.politica_tipo ||
+            (p.unidad ?? "") !== a.unidad
+          );
         })
         .map((a) => a.politica_codigo),
     ),
@@ -125,8 +134,24 @@ function requisitosAprobacion(
   out.push({
     ok: cambiadas.length === 0,
     texto: cambiadas.length
-      ? `Cambió el costo o se desactivó: ${cambiadas.join(", ")} (duplicala y volvé a guardarla)`
-      : "Los costos de las políticas no cambiaron desde que se guardó",
+      ? `Cambió en el catálogo (costo, nombre, tipo o unidad) o se desactivó: ${cambiadas.join(", ")}. Duplicala y volvé a guardarla.`
+      : "Las políticas siguen como estaban cuando se guardó",
+  });
+  const partidasCambiadas = [
+    ...new Set(
+      detalle.financiamiento
+        .filter((f) => {
+          const p = partida.get(f.partida_id);
+          return !p || p.codigo !== f.partida_codigo || p.partida_principal !== f.partida_principal;
+        })
+        .map((f) => f.partida_codigo),
+    ),
+  ];
+  out.push({
+    ok: partidasCambiadas.length === 0,
+    texto: partidasCambiadas.length
+      ? `Cambió la partida ${partidasCambiadas.join(", ")} desde que se guardó. Duplicala y volvé a guardarla.`
+      : "Las partidas siguen como estaban cuando se guardó",
   });
   const hoy = hoyLocal();
   const veda = datos.vedas.find((v) => v.desde <= hoy && hoy <= v.hasta);

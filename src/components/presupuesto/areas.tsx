@@ -267,6 +267,7 @@ export function QuienInterviene({
         className="flex w-fit items-center gap-1 rounded-md border border-celeste/40 px-2 py-1 text-[10.5px] font-bold text-celeste hover:bg-celeste/10"
       >
         <Printer size={11} /> Ficha del barrio para imprimir
+        <span className="font-normal text-texto-3">(con la última propuesta aprobada o guardada)</span>
       </a>
       <div className="flex flex-wrap items-center gap-1 text-[10px] text-texto-3">
         <DoorOpen size={11} className="text-celeste" /> Entrada al barrio:

@@ -120,6 +120,8 @@ export function Presupuesto({ esSuperadmin }: { esSuperadmin: boolean }) {
   const primeraCarga = useRef(true);
   // «Duplicar y ajustar»: Repartir arranca desde una propuesta guardada
   const [plantilla, setPlantilla] = useState<PlantillaReparto | null>(null);
+  // cada «Duplicar» reinicia Repartir, aunque sea la misma propuesta otra vez
+  const [vezPlantilla, setVezPlantilla] = useState(0);
   // Qué propuesta se mira en el paso 5
   const [enEjecucion, setEnEjecucion] = useState<number | null>(null);
   // Quién está usando la herramienta: para avisar antes si no puede aprobar lo que armó
@@ -353,15 +355,12 @@ export function Presupuesto({ esSuperadmin }: { esSuperadmin: boolean }) {
               Con key por modo: entrar o salir del ejemplo arranca de cero. */}
           <div hidden={seccion !== "asignar"}>
             <Asignar
-              key={`${ejemplo ? "ejemplo" : "real"}-${plantilla?.origen ?? "nueva"}`}
+              key={`${ejemplo ? "ejemplo" : "real"}-${plantilla ? `${plantilla.origen}-${vezPlantilla}` : "nueva"}`}
               supabase={cliente}
               datos={vista}
               ejemplo={ejemplo}
               inicial={plantilla}
-              onGuardado={async () => {
-                setPlantilla(null);
-                await recargar();
-              }}
+              onGuardado={recargar}
               irA={(s) => setSeccion(s)}
               onEjemplo={alternarEjemplo}
               onSoltarPlantilla={() => setPlantilla(null)}
@@ -376,6 +375,8 @@ export function Presupuesto({ esSuperadmin }: { esSuperadmin: boolean }) {
           )}
           {seccion === "escenarios" && (
             <Escenarios
+              // al entrar o salir del ejemplo no queda nada cargado del otro lado
+              key={ejemplo ? "ejemplo" : "real"}
               supabase={cliente}
               datos={vista}
               esSuperadmin={esSuperadmin}
@@ -384,6 +385,7 @@ export function Presupuesto({ esSuperadmin }: { esSuperadmin: boolean }) {
               miId={miId}
               onDuplicar={(p) => {
                 setPlantilla(p);
+                setVezPlantilla((n) => n + 1);
                 setSeccion("asignar");
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
@@ -395,6 +397,7 @@ export function Presupuesto({ esSuperadmin }: { esSuperadmin: boolean }) {
           )}
           {seccion === "ejecucion" && (
             <Ejecucion
+              key={ejemplo ? "ejemplo" : "real"}
               supabase={cliente}
               datos={vista}
               elegida={enEjecucion}

@@ -151,15 +151,22 @@ export function Seguimiento({
     return Object.fromEntries([...m.entries()].map(([b, x]) => [b, Math.max(0.01, x.a > 0 ? (100 * x.e) / x.a : 0)]));
   }, [celdas]);
 
+  // Las áreas que lideran algo en esta propuesta; la guardada solo vale si está entre ellas
+  const areasDeEsta = useMemo(
+    () => new Set(celdas.map((c) => AREAS_POLITICA[c.a.politica_codigo]?.lidera).filter((x): x is string => !!x)),
+    [celdas],
+  );
+  const areaEfectiva = areasDeEsta.has(area) ? area : "todas";
+
   const visibles = useMemo(() => {
     const q = busqueda.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
     return celdas
       .filter((c) => politica === "todas" || c.a.politica_id === politica)
-      .filter((c) => area === "todas" || AREAS_POLITICA[c.a.politica_codigo]?.lidera === area)
+      .filter((c) => areaEfectiva === "todas" || AREAS_POLITICA[c.a.politica_codigo]?.lidera === areaEfectiva)
       .filter((c) => estadoFiltro === "todos" || (borrador[c.k]?.estado ?? c.estado) === estadoFiltro)
       .filter((c) => !q || c.a.barrio.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().includes(q))
       .sort((x, y) => y.a.monto - x.a.monto);
-  }, [celdas, politica, area, estadoFiltro, busqueda, borrador]);
+  }, [celdas, politica, areaEfectiva, estadoFiltro, busqueda, borrador]);
 
   const editar = (c: (typeof celdas)[number], cambio: Partial<Borrador>) =>
     setBorrador((b) => {
@@ -434,7 +441,7 @@ export function Seguimiento({
             ))}
           </select>
           <select
-            value={area}
+            value={areaEfectiva}
             onChange={(e) => {
               setArea(e.target.value);
               setCuantas(POR_PAGINA);

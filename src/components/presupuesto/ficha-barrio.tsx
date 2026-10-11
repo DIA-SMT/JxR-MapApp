@@ -205,7 +205,9 @@ export function FichaBarrio({
 
           <div className={seccion}>Qué recibe</div>
           {!esc ? (
-            <p className="text-neutral-600">Todavía no hay propuestas guardadas.</p>
+            <p className="text-neutral-600">
+              No hay propuestas guardadas que sigan en juego (aprobadas o por aprobar).
+            </p>
           ) : recibe.length === 0 ? (
             <p className="text-neutral-600">La propuesta «{esc.nombre}» no le asigna nada a este barrio.</p>
           ) : (
