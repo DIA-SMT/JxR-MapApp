@@ -61,7 +61,58 @@ export function MontosPorPolitica({
           con «al menos» mayor que «como máximo» (contando el del catálogo): no se aplican hasta corregirlos.
         </p>
       )}
-      <div className="mt-2 max-h-[360px] overflow-auto">
+      {/* Celular: una tarjeta por política */}
+      <div className="mt-2 max-h-[460px] space-y-1.5 overflow-auto sm:hidden">
+        {filas.map((p) => {
+          const piso = texto[`${p.id}|piso`] ?? "";
+          const tope = texto[`${p.id}|tope`] ?? "";
+          const mal = invalidas.has(p.id);
+          return (
+            <div
+              key={p.id}
+              className={`rounded-lg border p-2 ${limites[p.id] != null ? "border-rosa/40 bg-rosa/5" : "border-borde"}`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="min-w-0 text-[11px] font-semibold">
+                  <span className="text-texto-3">{p.codigo}</span> {p.nombre}
+                </span>
+                <span className="num shrink-0 text-[11px] font-bold">
+                  {pesos(montoActual.get(String(p.id)) ?? 0, true)}
+                </span>
+              </div>
+              <div className="mt-1.5 grid grid-cols-[1fr_1fr_auto] items-center gap-1.5">
+                <input
+                  value={piso}
+                  onChange={(e) => poner(p.id, "piso", e.target.value)}
+                  placeholder="al menos $"
+                  inputMode="decimal"
+                  aria-label={`Al menos, ${p.nombre}`}
+                  className={campo(mal, piso !== "")}
+                />
+                <input
+                  value={tope}
+                  onChange={(e) => poner(p.id, "tope", e.target.value)}
+                  placeholder="como máximo $"
+                  inputMode="decimal"
+                  aria-label={`Como máximo, ${p.nombre}`}
+                  className={campo(mal, tope !== "")}
+                />
+                {(piso || tope) && (
+                  <button
+                    onClick={() => limpiar(p.id)}
+                    title="Volver a lo que decida el criterio"
+                    className="text-texto-3 hover:text-rosa"
+                  >
+                    <RotateCcw size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-2 hidden max-h-[360px] overflow-auto sm:block">
         <table className="w-full min-w-[560px] text-[11px]">
           <thead className="sticky top-0 z-10 bg-panel/95 text-left text-texto-3 backdrop-blur">
             <tr>

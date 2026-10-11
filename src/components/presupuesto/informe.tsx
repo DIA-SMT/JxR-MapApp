@@ -7,6 +7,8 @@ import {
   obtenerDetalleEscenario,
   obtenerEjecucion,
   obtenerEjercicio,
+  obtenerNecesidadBarrios,
+  obtenerPoliticas,
   type DetalleEscenario,
   type Ejercicio,
   type Escenario,
@@ -15,6 +17,7 @@ import {
 } from "@/lib/presupuesto-datos";
 import { pesos, plural, resumenParametros } from "@/lib/presupuesto";
 import { MapaImpreso } from "./mapa-impreso";
+import { propuestasEjemplo } from "@/lib/presupuesto-ejemplo";
 import { agruparPorArea } from "./areas";
 import { areasDePolitica } from "@/lib/organigrama";
 
@@ -43,7 +46,7 @@ const numero = (n: number) => Math.round(n).toLocaleString("es-AR");
  *
  * Sin la marca de la campaña: es un documento de gestión.
  */
-export function InformePresupuesto({ id }: { id: number }) {
+export function InformePresupuesto({ id, ejemplo = false }: { id: number; ejemplo?: boolean }) {
   const [supabase] = useState(crearClienteNavegador);
   const [esc, setEsc] = useState<Escenario | null>(null);
   const [det, setDet] = useState<DetalleEscenario | null>(null);
@@ -56,17 +59,21 @@ export function InformePresupuesto({ id }: { id: number }) {
   useEffect(() => {
     void (async () => {
       try {
-        const { data, error: e } = await supabase.from("escenarios_presupuesto").select("*").eq("id", id).maybeSingle();
+        // En el ejemplo, las propuestas se recalculan acá con el mismo motor y los mismos datos: da lo mismo.
+        const fuente = ejemplo
+          ? propuestasEjemplo(await obtenerPoliticas(supabase), await obtenerNecesidadBarrios(supabase)).cliente
+          : supabase;
+        const { data, error: e } = await fuente.from("escenarios_presupuesto").select("*").eq("id", id).maybeSingle();
         if (e) throw new Error(e.message);
         if (!data) return setError("La propuesta no existe o no tenés acceso al presupuesto.");
         const escenario = { ...(data as Escenario), avisos: Array.isArray(data.avisos) ? data.avisos : [] };
         const conSeguimiento = escenario.estado === "aprobado" || escenario.estado === "ejecutado";
         const [d, ej, s] = await Promise.all([
-          obtenerDetalleEscenario(supabase, id),
+          obtenerDetalleEscenario(fuente, id),
           obtenerEjercicio(supabase, escenario.ejercicio),
           // sin la migración 0017 no hay avance que mostrar; cualquier otro error frena el informe
           conSeguimiento
-            ? obtenerEjecucion(supabase, id).catch((x) => {
+            ? obtenerEjecucion(fuente, id).catch((x) => {
                 if (x instanceof SinSeguimiento) return [];
                 throw new Error(`no pude cargar el avance de la ejecución: ${x instanceof Error ? x.message : x}`);
               })
@@ -82,7 +89,7 @@ export function InformePresupuesto({ id }: { id: number }) {
         setError(x instanceof Error ? x.message : "no pude cargar la propuesta");
       }
     })();
-  }, [supabase, id]);
+  }, [supabase, id, ejemplo]);
 
   const total = useMemo(() => det?.asignaciones.reduce((a, x) => a + x.monto, 0) ?? 0, [det]);
 
@@ -209,7 +216,12 @@ export function InformePresupuesto({ id }: { id: number }) {
             </div>
           </div>
 
-          {!oficial && (
+          {ejemplo && (
+            <div className="mt-3 rounded border-2 border-dashed border-neutral-500 px-3 py-2 text-center text-[11px] font-bold tracking-wide text-neutral-700 uppercase">
+              Ejemplo con montos y costos inventados · solo para conocer la herramienta
+            </div>
+          )}
+          {!oficial && !ejemplo && (
             <div className="mt-3 rounded border-2 border-dashed border-neutral-500 px-3 py-2 text-center text-[11px] font-bold tracking-wide text-neutral-700 uppercase">
               {esc.estado === "descartado" ? "Propuesta descartada" : "Documento de trabajo"} · no es un acto
               administrativo

@@ -48,7 +48,28 @@ export function Seguimiento({
   const [sinTabla, setSinTabla] = useState<string | null>(null);
   const [borrador, setBorrador] = useState<Record<string, Borrador>>({});
   const [politica, setPolitica] = useState<number | "todas">("todas");
-  const [area, setArea] = useState<string>("todas");
+  const [area, setAreaEstado] = useState<string>("todas");
+  useEffect(() => {
+    try {
+      const guardada = localStorage.getItem("jxr:presupuesto-mi-area");
+      if (guardada) setAreaEstado(guardada);
+    } catch {
+      // sin almacenamiento, arranca en «todas»
+    }
+  }, []);
+  const setArea = (v: string) => {
+    setAreaEstado(v);
+    try {
+      localStorage.setItem("jxr:presupuesto-mi-area", v);
+    } catch {
+      // no pasa nada: solo no se recuerda
+    }
+  };
+  // Cargar en bloque sobre lo que se está viendo
+  const [enBloque, setEnBloque] = useState<{ estado: EstadoEjecucion | ""; expediente: string }>({
+    estado: "",
+    expediente: "",
+  });
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoEjecucion | "todos">("todos");
   const [busqueda, setBusqueda] = useState("");
   const [cuantas, setCuantas] = useState(POR_PAGINA);
@@ -210,7 +231,7 @@ export function Seguimiento({
 
   const exportar = () =>
     descargarCSV(
-      `seguimiento-escenario-${escenario}.csv`,
+      `seguimiento-propuesta-${escenario}.csv`,
       [
         "politica_codigo",
         "politica",
@@ -246,6 +267,74 @@ export function Seguimiento({
       </div>
     );
   if (!filas) return <p className="mt-3 text-[11px] text-texto-3">Cargando el seguimiento…</p>;
+
+  type Celda = (typeof celdas)[number];
+  const valores = (c: Celda) => {
+    const b = borrador[c.k];
+    const v: Borrador = b ?? {
+      estado: c.estado,
+      monto: aTexto(c.ejecutado),
+      unidades: aTexto(c.logrado),
+      expediente: c.expediente,
+      nota: c.nota,
+    };
+    return { b, v, mal: b ? problema(c, b) : null };
+  };
+  const controles = (c: Celda, v: Borrador) => ({
+    estado: (
+      <select
+        value={v.estado}
+        aria-label="Estado"
+        onChange={(e) => editar(c, { estado: e.target.value as EstadoEjecucion })}
+        className={`${campo} border-borde-2 font-bold ${ESTADOS_EJECUCION[v.estado].clase}`}
+      >
+        {Object.entries(ESTADOS_EJECUCION).map(([k, x]) => (
+          <option key={k} value={k}>
+            {x.texto}
+          </option>
+        ))}
+      </select>
+    ),
+    monto: (
+      <input
+        value={v.monto}
+        aria-label="Gastado en pesos"
+        onChange={(e) => editar(c, { monto: e.target.value.replace(/[^0-9.,]/g, "") })}
+        placeholder="$ gastado"
+        inputMode="decimal"
+        className={`num ${campo} border-borde-2`}
+      />
+    ),
+    unidades: (
+      <input
+        value={v.unidades}
+        aria-label="Logrado"
+        onChange={(e) => editar(c, { unidades: e.target.value.replace(/[^0-9.,]/g, "") })}
+        placeholder={plural(c.a.unidad)}
+        inputMode="decimal"
+        title={`Cuántas ${plural(c.a.unidad)} se lograron`}
+        className={`num ${campo} border-borde-2`}
+      />
+    ),
+    expediente: (
+      <input
+        value={v.expediente}
+        aria-label="Expediente"
+        onChange={(e) => editar(c, { expediente: e.target.value })}
+        placeholder="Expte. Nº"
+        className={`${campo} border-borde-2`}
+      />
+    ),
+    nota: (
+      <input
+        value={v.nota}
+        aria-label="Nota"
+        onChange={(e) => editar(c, { nota: e.target.value })}
+        placeholder="nota (opcional)"
+        className={`${campo} border-borde-2`}
+      />
+    ),
+  });
 
   const avance = total.asignado > 0 ? (100 * total.ejecutado) / total.asignado : 0;
   const campo =
@@ -350,10 +439,10 @@ export function Seguimiento({
               setArea(e.target.value);
               setCuantas(POR_PAGINA);
             }}
-            title="Cada área carga el avance de lo que lidera"
+            title="Cada área carga el avance de lo que lidera. Se recuerda en este navegador."
             className="max-w-56 rounded-md border border-borde-2 bg-panel px-1.5 py-1 text-[10.5px] outline-none"
           >
-            <option value="todas">Todas las áreas</option>
+            <option value="todas">Mi área: todas</option>
             {[
               ...new Set(
                 celdas.map((c) => AREAS_POLITICA[c.a.politica_codigo]?.lidera).filter((x): x is string => !!x),
@@ -390,7 +479,83 @@ export function Seguimiento({
           </span>
         </div>
 
-        <div className="mt-1.5 max-h-[420px] overflow-auto">
+        {/* En bloque: lo mismo a todo lo que coincide con el filtro */}
+        {visibles.length > 1 && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-celeste/40 px-2 py-1.5 text-[10.5px]">
+            <span className="text-texto-3">A las {visibles.length} filas del filtro:</span>
+            <select
+              value={enBloque.estado}
+              onChange={(e) => setEnBloque({ ...enBloque, estado: e.target.value as EstadoEjecucion | "" })}
+              className="rounded-md border border-borde-2 bg-panel px-1.5 py-1 text-[10.5px] outline-none"
+            >
+              <option value="">estado sin cambiar</option>
+              {Object.entries(ESTADOS_EJECUCION).map(([k, x]) => (
+                <option key={k} value={k}>
+                  {x.texto}
+                </option>
+              ))}
+            </select>
+            <input
+              value={enBloque.expediente}
+              onChange={(e) => setEnBloque({ ...enBloque, expediente: e.target.value })}
+              placeholder="mismo expediente (opcional)"
+              className="w-44 rounded-md border border-borde-2 bg-panel px-1.5 py-1 text-[10.5px] outline-none placeholder:text-texto-3"
+            />
+            <button
+              onClick={() => {
+                for (const c of visibles)
+                  editar(c, {
+                    ...(enBloque.estado ? { estado: enBloque.estado } : {}),
+                    ...(enBloque.expediente.trim() ? { expediente: enBloque.expediente.trim() } : {}),
+                  });
+                setEnBloque({ estado: "", expediente: "" });
+              }}
+              disabled={!enBloque.estado && !enBloque.expediente.trim()}
+              className="rounded-md bg-celeste/80 px-2 py-1 font-bold text-white disabled:opacity-40"
+            >
+              Aplicar
+            </button>
+            <span className="text-[9.5px] text-texto-3">Queda como cambio sin guardar: revisalo y guardá.</span>
+          </div>
+        )}
+
+        {/* Celular: una tarjeta por barrio y política */}
+        <div
+          className={`mt-1.5 max-h-[520px] space-y-1.5 overflow-auto sm:hidden ${ocupado ? "pointer-events-none opacity-60" : ""}`}
+        >
+          {visibles.slice(0, cuantas).map((c) => {
+            const { v, mal, b } = valores(c);
+            return (
+              <div
+                key={c.k}
+                className={`rounded-lg border p-2 ${mal ? "border-peligro/50 bg-peligro/10" : b ? "border-rosa/40 bg-rosa/5" : "border-borde"}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-[11px] font-bold">{c.a.barrio}</div>
+                    <div className="truncate text-[9.5px] text-texto-3">
+                      {c.a.politica_codigo} {c.a.politica_nombre}
+                    </div>
+                  </div>
+                  <div className="num shrink-0 text-right text-[10.5px]">
+                    {pesos(c.a.monto, true)}
+                    <div className="text-[9.5px] text-texto-3">aprobado</div>
+                  </div>
+                </div>
+                {mal && <div className="mt-0.5 text-[9.5px] font-bold text-peligro">{mal}</div>}
+                <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                  {controles(c, v).estado}
+                  {controles(c, v).monto}
+                  {controles(c, v).unidades}
+                  {controles(c, v).expediente}
+                  <div className="col-span-2">{controles(c, v).nota}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-1.5 hidden max-h-[420px] overflow-auto sm:block">
           <table className={`w-full min-w-[860px] text-[10.5px] ${ocupado ? "pointer-events-none opacity-60" : ""}`}>
             <thead className="sticky top-0 z-10 bg-panel/95 text-left text-texto-3 backdrop-blur">
               <tr>
@@ -405,15 +570,8 @@ export function Seguimiento({
             </thead>
             <tbody>
               {visibles.slice(0, cuantas).map((c) => {
-                const b = borrador[c.k];
-                const v: Borrador = b ?? {
-                  estado: c.estado,
-                  monto: aTexto(c.ejecutado),
-                  unidades: aTexto(c.logrado),
-                  expediente: c.expediente,
-                  nota: c.nota,
-                };
-                const mal = b ? problema(c, b) : null;
+                const { v, mal, b } = valores(c);
+                const k = controles(c, v);
                 return (
                   <tr
                     key={c.k}
@@ -433,59 +591,18 @@ export function Seguimiento({
                         {plural(c.a.unidad, Math.round(c.a.unidades))}
                       </div>
                     </td>
-                    <td className="py-1 pr-2">
-                      <select
-                        value={v.estado}
-                        onChange={(e) => editar(c, { estado: e.target.value as EstadoEjecucion })}
-                        className={`${campo} border-borde-2 font-bold ${ESTADOS_EJECUCION[v.estado].clase}`}
-                      >
-                        {Object.entries(ESTADOS_EJECUCION).map(([k, x]) => (
-                          <option key={k} value={k}>
-                            {x.texto}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-1 pr-2">
-                      <input
-                        value={v.monto}
-                        onChange={(e) => editar(c, { monto: e.target.value.replace(/[^0-9.,]/g, "") })}
-                        placeholder="0"
-                        inputMode="decimal"
-                        className={`num ${campo} border-borde-2`}
-                      />
-                    </td>
-                    <td className="py-1 pr-2">
-                      <input
-                        value={v.unidades}
-                        onChange={(e) => editar(c, { unidades: e.target.value.replace(/[^0-9.,]/g, "") })}
-                        placeholder={plural(c.a.unidad)}
-                        inputMode="decimal"
-                        title={`Cuántas ${plural(c.a.unidad)} se lograron`}
-                        className={`num ${campo} border-borde-2`}
-                      />
-                    </td>
-                    <td className="py-1 pr-2">
-                      <input
-                        value={v.expediente}
-                        onChange={(e) => editar(c, { expediente: e.target.value })}
-                        placeholder="Expte. Nº"
-                        className={`${campo} border-borde-2`}
-                      />
-                    </td>
-                    <td className="py-1">
-                      <input
-                        value={v.nota}
-                        onChange={(e) => editar(c, { nota: e.target.value })}
-                        placeholder="opcional"
-                        className={`${campo} border-borde-2`}
-                      />
-                    </td>
+                    <td className="py-1 pr-2">{k.estado}</td>
+                    <td className="py-1 pr-2">{k.monto}</td>
+                    <td className="py-1 pr-2">{k.unidades}</td>
+                    <td className="py-1 pr-2">{k.expediente}</td>
+                    <td className="py-1">{k.nota}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+        </div>
+        <div>
           {visibles.length === 0 && (
             <p className="py-3 text-center text-[11px] text-texto-3">Nada coincide con el filtro.</p>
           )}

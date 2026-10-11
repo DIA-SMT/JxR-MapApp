@@ -2,6 +2,7 @@
 
 import {
   Check,
+  ClipboardCheck,
   FileSpreadsheet,
   FlaskConical,
   History,
@@ -27,16 +28,17 @@ import {
   type Veda,
 } from "@/lib/presupuesto-datos";
 import { INDICADORES, libreAsignable, type BarrioNecesidad } from "@/lib/presupuesto";
-import { PARTIDAS_EJEMPLO, politicasEjemplo } from "@/lib/presupuesto-ejemplo";
+import { PARTIDAS_EJEMPLO, politicasEjemplo, propuestasEjemplo } from "@/lib/presupuesto-ejemplo";
 import { crearClienteNavegador } from "@/lib/supabase/cliente";
-import { Asignar } from "./asignar";
+import { Asignar, type PlantillaReparto } from "./asignar";
+import { Ejecucion } from "./ejecucion";
 import { Escenarios } from "./escenarios";
 import { Partidas } from "./partidas";
 import { Politicas } from "./politicas";
 
-type Seccion = "disponible" | "politicas" | "asignar" | "escenarios";
+type Seccion = "disponible" | "politicas" | "asignar" | "escenarios" | "ejecucion";
 
-/** Los cuatro pasos, en el orden en que se usan. */
+/** Los cinco pasos, en el orden en que se usan. */
 const PASOS: Array<{
   clave: Seccion;
   n: number;
@@ -71,6 +73,13 @@ const PASOS: Array<{
     etiqueta: "Guardar y aprobar",
     icono: History,
     queHacer: "Guardá la propuesta y que la apruebe otra persona",
+  },
+  {
+    clave: "ejecucion",
+    n: 5,
+    etiqueta: "Ejecución",
+    icono: ClipboardCheck,
+    queHacer: "Cargá qué se hizo en cada barrio y mirá el avance",
   },
 ];
 
@@ -109,6 +118,15 @@ export function Presupuesto({ esSuperadmin }: { esSuperadmin: boolean }) {
   const [ejemplo, setEjemplo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const primeraCarga = useRef(true);
+  // «Duplicar y ajustar»: Repartir arranca desde una propuesta guardada
+  const [plantilla, setPlantilla] = useState<PlantillaReparto | null>(null);
+  // Qué propuesta se mira en el paso 5
+  const [enEjecucion, setEnEjecucion] = useState<number | null>(null);
+  // Quién está usando la herramienta: para avisar antes si no puede aprobar lo que armó
+  const [miId, setMiId] = useState<string | null>(null);
+  useEffect(() => {
+    void supabase.auth.getUser().then(({ data }) => setMiId(data.user?.id ?? null));
+  }, [supabase]);
 
   const recargar = useCallback(async () => {
     try {
@@ -154,6 +172,11 @@ export function Presupuesto({ esSuperadmin }: { esSuperadmin: boolean }) {
     return null;
   }, [datos?.vedas]);
 
+  const delEjemplo = useMemo(
+    () => (ejemplo && datos ? propuestasEjemplo(datos.politicas, datos.barrios) : null),
+    [ejemplo, datos],
+  );
+
   // Sin datos, el error es toda la pantalla. Con datos, un aviso arriba: una
   // recarga que falla no puede tirar lo que se estaba armando en Asignar.
   if (error && !datos)
@@ -169,15 +192,18 @@ export function Presupuesto({ esSuperadmin }: { esSuperadmin: boolean }) {
 
   const propuestos = datos ? datos.escenarios.filter((e) => e.estado === "propuesto").length : 0;
 
-  // Lo que ve cada pestaña: en modo ejemplo, la plata y los costos son inventados.
+  // Lo que ve cada pestaña: en modo ejemplo, la plata, los costos y las propuestas son inventados,
+  // y se leen de un cliente en memoria: nada toca la base.
   const vista: DatosPresupuesto | null =
-    datos && ejemplo
+    datos && ejemplo && delEjemplo
       ? {
           ...datos,
           partidas: PARTIDAS_EJEMPLO,
           politicas: politicasEjemplo(datos.politicas),
+          escenarios: delEjemplo.escenarios,
         }
       : datos;
+  const cliente = ejemplo && delEjemplo ? delEjemplo.cliente : supabase;
 
   const estado: Record<Seccion, boolean> | null = datos
     ? {
@@ -187,11 +213,14 @@ export function Presupuesto({ esSuperadmin }: { esSuperadmin: boolean }) {
         ),
         asignar: datos.escenarios.length > 0,
         escenarios: datos.escenarios.some((e) => e.estado === "aprobado" || e.estado === "ejecutado"),
+        ejecucion: datos.escenarios.some((e) => e.estado === "ejecutado"),
       }
     : null;
 
   const alternarEjemplo = () => {
     if (!ejemplo) setSeccion("asignar");
+    setPlantilla(null);
+    setEnEjecucion(null);
     setEjemplo((e) => !e);
   };
 
@@ -233,9 +262,9 @@ export function Presupuesto({ esSuperadmin }: { esSuperadmin: boolean }) {
         <div className="flex items-start gap-2 rounded-2xl border-2 border-dashed border-encurso/60 bg-encurso/10 px-4 py-2.5 text-[11px] leading-snug text-encurso">
           <FlaskConical size={14} className="mt-0.5 shrink-0" />
           <span>
-            <b>Estás en un EJEMPLO.</b> La plata disponible (5 partidas, $5.300 M) y los costos de las políticas son
-            inventados; la necesidad de cada barrio es la real del censo. Probá los criterios en «Repartir» y mirá el
-            mapa. <b>No se guarda nada.</b>
+            <b>Estás en un EJEMPLO.</b> La plata disponible (5 partidas, $5.300 M), los costos y dos propuestas —una
+            aprobada y con obras en marcha— son inventados; la necesidad de cada barrio es la real del censo. Recorré
+            los cinco pasos: repartí, compará propuestas, abrí el informe y cargá avances. <b>No se guarda nada.</b>
           </span>
         </div>
       )}
@@ -279,7 +308,7 @@ export function Presupuesto({ esSuperadmin }: { esSuperadmin: boolean }) {
       )}
 
       {/* Los pasos: cada uno dice qué se hace ahí y si ya está hecho */}
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {PASOS.map((p) => {
           const activo = seccion === p.clave;
           const hecho = !ejemplo && (estado?.[p.clave] ?? false);
@@ -324,13 +353,18 @@ export function Presupuesto({ esSuperadmin }: { esSuperadmin: boolean }) {
               Con key por modo: entrar o salir del ejemplo arranca de cero. */}
           <div hidden={seccion !== "asignar"}>
             <Asignar
-              key={ejemplo ? "ejemplo" : "real"}
-              supabase={supabase}
+              key={`${ejemplo ? "ejemplo" : "real"}-${plantilla?.origen ?? "nueva"}`}
+              supabase={cliente}
               datos={vista}
               ejemplo={ejemplo}
-              onGuardado={recargar}
+              inicial={plantilla}
+              onGuardado={async () => {
+                setPlantilla(null);
+                await recargar();
+              }}
               irA={(s) => setSeccion(s)}
               onEjemplo={alternarEjemplo}
+              onSoltarPlantilla={() => setPlantilla(null)}
             />
           </div>
           {/* En el ejemplo, las otras pestañas muestran los datos inventados y no se editan */}
@@ -341,7 +375,33 @@ export function Presupuesto({ esSuperadmin }: { esSuperadmin: boolean }) {
             <Politicas supabase={supabase} datos={vista} esSuperadmin={esSuperadmin && !ejemplo} onCambio={recargar} />
           )}
           {seccion === "escenarios" && (
-            <Escenarios supabase={supabase} datos={datos} esSuperadmin={esSuperadmin} onCambio={recargar} />
+            <Escenarios
+              supabase={cliente}
+              datos={vista}
+              esSuperadmin={esSuperadmin}
+              onCambio={recargar}
+              ejemplo={ejemplo}
+              miId={miId}
+              onDuplicar={(p) => {
+                setPlantilla(p);
+                setSeccion("asignar");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              onVerEjecucion={(id) => {
+                setEnEjecucion(id);
+                setSeccion("ejecucion");
+              }}
+            />
+          )}
+          {seccion === "ejecucion" && (
+            <Ejecucion
+              supabase={cliente}
+              datos={vista}
+              elegida={enEjecucion}
+              onElegir={setEnEjecucion}
+              onEjemplo={alternarEjemplo}
+              ejemplo={ejemplo}
+            />
           )}
         </>
       )}

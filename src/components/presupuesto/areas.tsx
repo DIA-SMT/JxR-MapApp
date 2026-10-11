@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, ChevronDown, ChevronRight, DoorOpen, Download, Users } from "lucide-react";
+import { Building2, ChevronDown, ChevronRight, DoorOpen, Download, Printer, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   AREA,
@@ -178,11 +178,13 @@ export function QuienInterviene({
   barrios,
   politicas,
   asignaciones,
+  ejemplo = false,
 }: {
   barrio: BarrioNecesidad;
   barrios: BarrioNecesidad[];
   politicas: PoliticaCatalogo[];
   asignaciones: Array<{ codigo: string; monto: number }>;
+  ejemplo?: boolean;
 }) {
   const demandas = useMemo(() => demandasDeBarrio(barrio, barrios), [barrio, barrios]);
   const activas = politicas.filter((p) => p.activa && p.tipo !== "institucional");
@@ -258,6 +260,14 @@ export function QuienInterviene({
         </div>
       )}
 
+      <a
+        href={`/imprimir/barrio/${encodeURIComponent(barrio.id)}${ejemplo ? "?ejemplo=1" : ""}`}
+        target="_blank"
+        rel="noopener"
+        className="flex w-fit items-center gap-1 rounded-md border border-celeste/40 px-2 py-1 text-[10.5px] font-bold text-celeste hover:bg-celeste/10"
+      >
+        <Printer size={11} /> Ficha del barrio para imprimir
+      </a>
       <div className="flex flex-wrap items-center gap-1 text-[10px] text-texto-3">
         <DoorOpen size={11} className="text-celeste" /> Entrada al barrio:
         {AREAS_TERRITORIALES.map((id) => (

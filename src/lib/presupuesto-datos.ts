@@ -97,7 +97,11 @@ export async function puedePresupuesto(supabase: SupabaseClient): Promise<boolea
 }
 
 export async function obtenerEjercicio(supabase: SupabaseClient, ejercicio = EJERCICIO): Promise<Ejercicio | null> {
-  const { data, error } = await supabase.from("presupuesto_ejercicios").select("*").eq("ejercicio", ejercicio).maybeSingle();
+  const { data, error } = await supabase
+    .from("presupuesto_ejercicios")
+    .select("*")
+    .eq("ejercicio", ejercicio)
+    .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) return null;
   return { ...data, total_corrientes: num(data.total_corrientes), total_capital: num(data.total_capital) } as Ejercicio;
@@ -181,10 +185,15 @@ export async function guardarPartidas(
 }
 
 /** Agrega UNA partida nueva. Si el código ya existe no la pisa: devuelve el error. */
-export async function agregarPartida(supabase: SupabaseClient, f: NuevaPartida, ejercicio = EJERCICIO): Promise<string | null> {
+export async function agregarPartida(
+  supabase: SupabaseClient,
+  f: NuevaPartida,
+  ejercicio = EJERCICIO,
+): Promise<string | null> {
   const { error } = await supabase.from("presupuesto_partidas").insert(filaPartida(f, ejercicio));
   if (!error) return null;
-  if (error.code === "23505") return `Ya existe una partida con el código «${f.codigo}»: no se reemplaza por una estimación.`;
+  if (error.code === "23505")
+    return `Ya existe una partida con el código «${f.codigo}»: no se reemplaza por una estimación.`;
   return error.message;
 }
 
@@ -192,7 +201,8 @@ export async function borrarPartida(supabase: SupabaseClient, id: number): Promi
   const { error } = await supabase.from("presupuesto_partidas").delete().eq("id", id);
   if (!error) return null;
   // la FK es "on delete restrict": según la versión de Postgres llega como 23503 o 23001
-  if (error.code === "23503" || error.code === "23001") return "Esta partida financia algún escenario guardado: no se puede borrar.";
+  if (error.code === "23503" || error.code === "23001")
+    return "Esta partida financia alguna propuesta guardada: no se puede borrar.";
   return error.message;
 }
 
@@ -298,21 +308,46 @@ export interface DetalleEscenario {
     politica_nombre: string;
     politica_tipo: string;
     unidad: string;
+    costo_unitario: number;
   }>;
-  financiamiento: Array<{ partida_id: number; politica_id: number; monto: number; partida_codigo: string; partida_principal: string }>;
+  financiamiento: Array<{
+    partida_id: number;
+    politica_id: number;
+    monto: number;
+    partida_codigo: string;
+    partida_principal: string;
+  }>;
   ajustes: Array<{ politica_id: number; barrio: string; monto_motor: number; monto_fijado: number; motivo: string }>;
 }
 
 export async function obtenerDetalleEscenario(supabase: SupabaseClient, id: number): Promise<DetalleEscenario> {
   const [asignaciones, financiamiento, ajustes] = await Promise.all([
     todas<Record<string, unknown>>((d, h) =>
-      supabase.from("escenario_asignaciones").select("*").eq("escenario_id", id).order("politica_id").order("barrio").range(d, h),
+      supabase
+        .from("escenario_asignaciones")
+        .select("*")
+        .eq("escenario_id", id)
+        .order("politica_id")
+        .order("barrio")
+        .range(d, h),
     ),
     todas<Record<string, unknown>>((d, h) =>
-      supabase.from("escenario_financiamiento").select("*").eq("escenario_id", id).order("partida_id").order("politica_id").range(d, h),
+      supabase
+        .from("escenario_financiamiento")
+        .select("*")
+        .eq("escenario_id", id)
+        .order("partida_id")
+        .order("politica_id")
+        .range(d, h),
     ),
     todas<Record<string, unknown>>((d, h) =>
-      supabase.from("escenario_ajustes").select("*").eq("escenario_id", id).order("politica_id").order("barrio").range(d, h),
+      supabase
+        .from("escenario_ajustes")
+        .select("*")
+        .eq("escenario_id", id)
+        .order("politica_id")
+        .order("barrio")
+        .range(d, h),
     ),
   ]);
   return {
@@ -326,6 +361,7 @@ export async function obtenerDetalleEscenario(supabase: SupabaseClient, id: numb
       politica_nombre: String(a.politica_nombre ?? ""),
       politica_tipo: String(a.politica_tipo ?? ""),
       unidad: String(a.unidad ?? ""),
+      costo_unitario: num(a.costo_unitario),
     })),
     financiamiento: financiamiento.map((f) => ({
       partida_id: Number(f.partida_id),
@@ -397,11 +433,28 @@ export async function guardarEscenario(
     p_ejercicio: ejercicio,
   });
   if (error) {
-    if (error.code === "23514") return { id: null, error: "Los montos no cuadran con el costo por unidad vigente: recalculá y volvé a guardar." };
-    return { id: null, error: error.message };
+    if (error.code === "23514")
+      return { id: null, error: "Los montos no cuadran con el costo por unidad vigente: recalculá y volvé a guardar." };
+    return { id: null, error: enPropuesta(error.message) };
   }
   return { id: Number(data), error: null };
 }
+
+/** La base habla de «escenarios»; la pantalla, de «propuestas». */
+export const enPropuesta = (m: string) =>
+  m
+    .replace(/\blos escenarios\b/g, "las propuestas")
+    .replace(/\bescenarios\b/g, "propuestas")
+    .replace(/\bEscenarios\b/g, "Propuestas")
+    .replace(/\bdel escenario\b/g, "de la propuesta")
+    .replace(/\bun escenario\b/g, "una propuesta")
+    .replace(/\bel escenario\b/g, "la propuesta")
+    .replace(/\bescenario\b/g, "propuesta")
+    // y que concuerde el género
+    .replace(/propuesta aprobado/g, "propuesta aprobada")
+    .replace(/propuesta como ejecutado/g, "propuesta como ejecutada")
+    .replace(/propuesta no lo aprueba/g, "propuesta no la aprueba")
+    .replace(/volvé a calcularlo y guardarlo/g, "volvé a calcularla y guardarla");
 
 export async function cambiarEstadoEscenario(
   supabase: SupabaseClient,
@@ -416,12 +469,12 @@ export async function cambiarEstadoEscenario(
     p_norma: norma,
     p_boletin: boletin,
   });
-  return error ? error.message : null;
+  return error ? enPropuesta(error.message) : null;
 }
 
 export async function borrarEscenario(supabase: SupabaseClient, id: number): Promise<string | null> {
   const { error } = await supabase.rpc("borrar_escenario", { p_id: id });
-  return error ? error.message : null;
+  return error ? enPropuesta(error.message) : null;
 }
 
 export async function obtenerBitacora(supabase: SupabaseClient, limite = 100): Promise<EntradaBitacora[]> {
@@ -448,7 +501,11 @@ export async function obtenerAccesos(supabase: SupabaseClient): Promise<Acceso[]
   return (data ?? []) as Acceso[];
 }
 
-export async function habilitarAcceso(supabase: SupabaseClient, perfil: string, habilitar: boolean): Promise<string | null> {
+export async function habilitarAcceso(
+  supabase: SupabaseClient,
+  perfil: string,
+  habilitar: boolean,
+): Promise<string | null> {
   const { error } = await supabase.rpc("presupuesto_habilitar", { p_perfil: perfil, p_habilitar: habilitar });
   return error ? error.message : null;
 }
@@ -521,6 +578,7 @@ export async function registrarEjecucion(
       nota: f.nota,
     })),
   });
-  if (error?.code === "PGRST202") return "El seguimiento todavía no está activado en la base (falta la migración 0017).";
+  if (error?.code === "PGRST202")
+    return "El seguimiento todavía no está activado en la base (falta la migración 0017).";
   return error ? error.message : null;
 }

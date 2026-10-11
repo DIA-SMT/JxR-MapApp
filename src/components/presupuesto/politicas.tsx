@@ -558,7 +558,45 @@ function CostosRapidos({
         </b>{" "}
         tienen costo.
       </p>
-      <div className="mt-3 max-h-[440px] overflow-auto">
+      {/* Celular: una tarjeta por política */}
+      <div className="mt-3 max-h-[520px] space-y-1.5 overflow-auto sm:hidden">
+        {activas.map((p) => {
+          const n = parsearImporte(valores[p.id] || "");
+          const necesidad = necesidadCiudad[p.indicador] ?? 0;
+          return (
+            <div key={p.id} className="rounded-lg border border-borde p-2">
+              <div className="text-[11px] font-semibold">
+                <span className="text-texto-3">{p.codigo}</span> {p.nombre}
+              </div>
+              <div className="text-[10px] text-texto-3">
+                {INDICADORES[p.indicador].etiqueta}: {Math.round(necesidad).toLocaleString("es-AR")}
+              </div>
+              <div className="mt-1.5 flex items-center gap-1 text-[11px]">
+                <span className="text-texto-3">$</span>
+                <input
+                  disabled={!puedeEditar}
+                  value={valores[p.id] ?? ""}
+                  onChange={(e) => setValores({ ...valores, [p.id]: e.target.value.replace(/[^0-9.,]/g, "") })}
+                  placeholder="—"
+                  inputMode="decimal"
+                  aria-label={`Costo por unidad, ${p.nombre}`}
+                  className={`num w-28 rounded-md border bg-panel px-2 py-1 text-[11px] outline-none focus:border-rosa/50 disabled:opacity-60 ${
+                    n > 0 ? "border-borde-2" : "border-encurso/50"
+                  }`}
+                />
+                <span className="text-texto-3">por {p.unidad || "unidad"}</span>
+              </div>
+              {n > 0 && (
+                <div className="mt-0.5 text-[10px] text-texto-2">
+                  Cubrir a toda la ciudad: {pesos(n * necesidad, true)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-3 hidden max-h-[440px] overflow-auto sm:block">
         <table className="w-full min-w-[640px] text-[11px]">
           <thead className="sticky top-0 z-10 bg-panel/95 text-left text-texto-3 backdrop-blur">
             <tr>

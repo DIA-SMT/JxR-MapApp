@@ -13,6 +13,7 @@ import {
 import { agregarPartida, borrarPartida, guardarPartidas } from "@/lib/presupuesto-datos";
 import { descargarCSV } from "@/lib/csv";
 import { Cifra, Cifras } from "@/components/ui/cifras";
+import { GLOSARIO, Termino } from "@/components/ui/termino";
 import { Vacio } from "@/components/ui/vacio";
 import { pesos } from "./asignar";
 import type { DatosPresupuesto } from "./panel";
@@ -217,18 +218,14 @@ export function Partidas({
       {/* Sin nada cargado, las cifras en cero y la vara de control solo distraen: primero el formulario */}
       {datos.partidas.length > 0 && (
         <Cifras>
-          <Cifra valor={pesos(t.vigente, true)} etiqueta="crédito vigente" />
-          <Cifra valor={pesos(t.comprometido, true)} etiqueta="comprometido" />
-          <Cifra
-            valor={pesos(t.reservado, true)}
-            etiqueta="reservado"
-            titulo="Lo que ya tomaron los escenarios aprobados que todavía no se ejecutaron"
-          />
+          <Cifra valor={pesos(t.vigente, true)} etiqueta="crédito vigente" titulo={GLOSARIO.vigente} />
+          <Cifra valor={pesos(t.comprometido, true)} etiqueta="comprometido" titulo={GLOSARIO.comprometido} />
+          <Cifra valor={pesos(t.reservado, true)} etiqueta="reservado" titulo={GLOSARIO.reservado} />
           <Cifra
             valor={pesos(t.libre, true)}
             etiqueta="libre para asignar"
             tono="marca"
-            titulo="Sin personal, intereses, inversión financiera ni amortización"
+            titulo={`${GLOSARIO.libre} Sin personal, intereses, inversión financiera ni amortización.`}
           />
           <Cifra valor={datos.partidas.length.toLocaleString("es-AR")} etiqueta="partidas" />
         </Cifras>
@@ -242,12 +239,12 @@ export function Partidas({
               {t.excedidas.length} partida{t.excedidas.length === 1 ? "" : "s"} excedida
               {t.excedidas.length === 1 ? "" : "s"}:
             </b>{" "}
-            lo reservado por escenarios aprobados ya no entra porque bajó el crédito o subió el comprometido (
+            lo reservado por propuestas aprobadas ya no entra porque bajó el crédito o subió el comprometido (
             {t.excedidas
               .slice(0, 4)
               .map((p) => `${p.codigo} por ${pesos(p.excedido, true)}`)
               .join(", ")}
-            {t.excedidas.length > 4 ? "…" : ""}). Hay que corregir el escenario o reforzar la partida por la vía que
+            {t.excedidas.length > 4 ? "…" : ""}). Hay que corregir la propuesta o reforzar la partida por la vía que
             corresponda.
           </span>
         </div>
@@ -277,7 +274,7 @@ export function Partidas({
           )}
           {t.estimadas > 0 && (
             <span className="mt-1 block text-encurso">
-              Hay {t.estimadas} partidas estimadas: sirven para simular, pero un escenario que las use no se puede
+              Hay {t.estimadas} partidas estimadas: sirven para simular, pero una propuesta que las use no se puede
               aprobar.
             </span>
           )}
@@ -362,9 +359,15 @@ export function Partidas({
                       <tr>
                         <th className="pr-2 font-semibold">Código</th>
                         <th className="pr-2 font-semibold">Ítem</th>
-                        <th className="pr-2 font-semibold">Partida principal</th>
-                        <th className="num pr-2 text-right font-semibold">Vigente</th>
-                        <th className="num text-right font-semibold">Comprometido</th>
+                        <th className="pr-2 font-semibold">
+                          <Termino t="partidaPrincipal">Partida principal</Termino>
+                        </th>
+                        <th className="num pr-2 text-right font-semibold">
+                          <Termino t="vigente">Vigente</Termino>
+                        </th>
+                        <th className="num text-right font-semibold">
+                          <Termino t="comprometido">Comprometido</Termino>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -486,11 +489,21 @@ export function Partidas({
               <thead className="sticky top-0 z-10 bg-panel/95 text-left text-texto-3 backdrop-blur">
                 <tr>
                   <th className="py-1 pr-2 font-semibold">Partida</th>
-                  <th className="py-1 pr-2 font-semibold">Partida principal</th>
-                  <th className="num py-1 pr-2 text-right font-semibold">Vigente</th>
-                  <th className="num py-1 pr-2 text-right font-semibold">Comprometido</th>
-                  <th className="num py-1 pr-2 text-right font-semibold">Reservado</th>
-                  <th className="num py-1 pr-2 text-right font-semibold">Libre</th>
+                  <th className="py-1 pr-2 font-semibold">
+                    <Termino t="partidaPrincipal">Partida principal</Termino>
+                  </th>
+                  <th className="num py-1 pr-2 text-right font-semibold">
+                    <Termino t="vigente">Vigente</Termino>
+                  </th>
+                  <th className="num py-1 pr-2 text-right font-semibold">
+                    <Termino t="comprometido">Comprometido</Termino>
+                  </th>
+                  <th className="num py-1 pr-2 text-right font-semibold">
+                    <Termino t="reservado">Reservado</Termino>
+                  </th>
+                  <th className="num py-1 pr-2 text-right font-semibold">
+                    <Termino t="libre">Libre</Termino>
+                  </th>
                   <th className="py-1 font-semibold" />
                 </tr>
               </thead>

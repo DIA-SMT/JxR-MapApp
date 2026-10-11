@@ -34,6 +34,8 @@ import { CRITERIOS, pesos } from "@/lib/presupuesto";
 export { pesos, resumenParametros } from "@/lib/presupuesto";
 import { MontosPorPolitica } from "./montos-politica";
 import { QuienInterviene } from "./areas";
+import { conSigno } from "./comparar";
+import { obtenerDetalleEscenario } from "@/lib/presupuesto-datos";
 import type { DatosPresupuesto } from "./panel";
 
 const numero = (n: number) => Math.round(n).toLocaleString("es-AR");
@@ -46,33 +48,68 @@ const TIPO: Record<string, string> = {
   institucional: "Institucional",
 };
 
-type Vista = "total" | "hogar";
+type Vista = "total" | "hogar" | "diferencia";
+
+/** Para retomar una propuesta guardada: el criterio, las políticas y lo decidido a mano. */
+export interface PlantillaReparto {
+  /** Id de la propuesta de origen (también sirve de key para reiniciar Repartir). */
+  origen: number;
+  nombre: string;
+  criterio: string;
+  intensidad: number;
+  equidad: number;
+  politicas: number[];
+  fijos: Record<string, number>;
+  motivos: Record<string, string>;
+  limites: Record<string, { piso?: number; tope?: number }>;
+}
+
+/** Un número como se tipea acá: coma decimal, sin separador de miles. */
+const aTexto = (n: number) => n.toLocaleString("es-AR", { useGrouping: false, maximumFractionDigits: 2 });
 
 export function Asignar({
   supabase,
   datos,
   ejemplo = false,
+  inicial,
   onGuardado,
   irA,
   onEjemplo,
+  onSoltarPlantilla,
 }: {
   supabase: SupabaseClient;
   datos: DatosPresupuesto;
   /** Modo ejemplo: montos inventados, no se guarda. */
   ejemplo?: boolean;
+  /** Una propuesta guardada desde la que se arranca («Duplicar y ajustar»). */
+  inicial?: PlantillaReparto | null;
   onGuardado: () => Promise<void> | void;
   irA: (s: "disponible" | "politicas" | "escenarios") => void;
   onEjemplo?: () => void;
+  onSoltarPlantilla?: () => void;
 }) {
-  const [intensidad, setIntensidad] = useState(1);
-  const [equidad, setEquidad] = useState(1);
-  const [excluidasManual, setExcluidasManual] = useState<Set<number>>(new Set());
-  const [fijos, setFijos] = useState<Record<string, number>>({});
+  const [intensidad, setIntensidad] = useState(inicial?.intensidad ?? 1);
+  const [equidad, setEquidad] = useState(inicial?.equidad ?? 1);
+  const [excluidasManual, setExcluidasManual] = useState<Set<number>>(() => {
+    if (!inicial || inicial.politicas.length === 0) return new Set();
+    const dentro = new Set(inicial.politicas);
+    return new Set(
+      datos.politicas.filter((p) => p.activa && p.tipo !== "institucional" && !dentro.has(p.id)).map((p) => p.id),
+    );
+  });
+  const [fijos, setFijos] = useState<Record<string, number>>(inicial?.fijos ?? {});
   // «al menos» y «como máximo» por política, tal como se escribieron
-  const [textoLimites, setTextoLimites] = useState<Record<string, string>>({});
+  const [textoLimites, setTextoLimites] = useState<Record<string, string>>(() => {
+    const t: Record<string, string> = {};
+    for (const [id, l] of Object.entries(inicial?.limites ?? {})) {
+      if (l.piso != null) t[`${id}|piso`] = aTexto(l.piso);
+      if (l.tope != null) t[`${id}|tope`] = aTexto(l.tope);
+    }
+    return t;
+  });
   const leidos = useMemo(() => leerLimites(textoLimites), [textoLimites]);
   // por qué se tocó cada celda: quien aprueba ve cada desvío del criterio
-  const [motivos, setMotivos] = useState<Record<string, string>>({});
+  const [motivos, setMotivos] = useState<Record<string, string>>(inicial?.motivos ?? {});
   const [barrio, setBarrio] = useState<string | null>(null);
   // En pantallas angostas el detalle queda debajo del mapa: al elegir un barrio, se lo trae a la vista.
   const detalleRef = useRef<HTMLDivElement>(null);
@@ -81,8 +118,30 @@ export function Asignar({
   }, [barrio]);
   const [vista, setVista] = useState<Vista>("total");
   const [busqueda, setBusqueda] = useState("");
-  const [nombre, setNombre] = useState("");
-  const [criterio, setCriterio] = useState("");
+  const [nombre, setNombre] = useState(inicial ? `${inicial.nombre} (ajustada)` : "");
+  const [criterio, setCriterio] = useState(inicial?.criterio ?? "");
+  const guardarRef = useRef<HTMLDivElement>(null);
+  const nombreRef = useRef<HTMLInputElement>(null);
+
+  // Comparar lo que se está armando contra una propuesta guardada
+  const [compararId, setCompararId] = useState<number | null>(null);
+  const [comparada, setComparada] = useState<Map<string, number> | null>(null);
+  useEffect(() => {
+    setComparada(null);
+    if (compararId == null) return;
+    let vivo = true;
+    void obtenerDetalleEscenario(supabase, compararId)
+      .then((d) => {
+        if (!vivo) return;
+        const m = new Map<string, number>();
+        for (const a of d.asignaciones) m.set(a.barrio, (m.get(a.barrio) ?? 0) + a.monto);
+        setComparada(m);
+      })
+      .catch(() => vivo && setCompararId(null));
+    return () => {
+      vivo = false;
+    };
+  }, [compararId, supabase]);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<{ ok: boolean; texto: string } | null>(null);
 
@@ -201,8 +260,19 @@ export function Asignar({
     return m;
   }, [r]);
 
+  // barrio por barrio: lo que se está armando menos lo de la propuesta guardada
+  const diferencias = useMemo(() => {
+    if (!comparada) return null;
+    const ids = new Set([...porBarrio.keys(), ...comparada.keys()]);
+    return [...ids].map((id) => ({ id, dif: (porBarrio.get(id)?.monto ?? 0) - (comparada.get(id) ?? 0) }));
+  }, [porBarrio, comparada]);
+
   const valoresMapa = useMemo(() => {
     const out: Record<string, number> = {};
+    if (vista === "diferencia") {
+      for (const d of diferencias ?? []) out[d.id] = d.dif;
+      return out;
+    }
     for (const [b, x] of porBarrio) {
       if (vista === "total") out[b] = x.monto;
       else {
@@ -211,7 +281,7 @@ export function Asignar({
       }
     }
     return out;
-  }, [porBarrio, vista, barrioPorId]);
+  }, [porBarrio, vista, barrioPorId, diferencias]);
 
   const filasBarrioTodas = useMemo(
     () => [...porBarrio.entries()].map(([id, x]) => ({ id, monto: x.monto })).sort((a, b) => b.monto - a.monto),
@@ -507,6 +577,21 @@ export function Asignar({
         </details>
       </div>
 
+      {inicial && (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border-2 border-dashed border-celeste/50 bg-celeste/10 px-4 py-2.5 text-[11px] text-celeste">
+          <span className="min-w-0 flex-1">
+            Partís de la propuesta <b>«{inicial.nombre}»</b>: el criterio, las políticas, los montos decididos y los
+            ajustes a mano ya están cargados. Cambiá lo que quieras y guardalo como una propuesta nueva; la original no
+            se toca.
+          </span>
+          {onSoltarPlantilla && (
+            <button onClick={onSoltarPlantilla} className="shrink-0 font-bold underline">
+              Empezar de cero
+            </button>
+          )}
+        </div>
+      )}
+
       <MontosPorPolitica
         politicas={candidatas.filter((p) => entradas.politicas.some((e) => e.id === String(p.id)))}
         montoActual={new Map(r.porPolitica.map((p) => [p.politica, p.monto]))}
@@ -546,6 +631,36 @@ export function Asignar({
             </>
           )}
         </p>
+        {datos.escenarios.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-borde pt-2 text-[11px]">
+            <span className="text-texto-3">Comparar con</span>
+            <select
+              value={compararId ?? ""}
+              onChange={(e) => {
+                const v = e.target.value ? Number(e.target.value) : null;
+                setCompararId(v);
+                setVista(v == null ? "total" : "diferencia");
+              }}
+              className="max-w-72 rounded-md border border-borde-2 bg-panel px-1.5 py-1 text-[11px] outline-none"
+            >
+              <option value="">ninguna propuesta</option>
+              {datos.escenarios.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.nombre} · {e.estado}
+                </option>
+              ))}
+            </select>
+            {compararId != null && !diferencias && <span className="text-texto-3">cargando…</span>}
+            {diferencias && (
+              <span>
+                Frente a esa propuesta:{" "}
+                <b className="num">{conSigno(r.asignado - [...comparada!.values()].reduce((s, x) => s + x, 0))}</b> en
+                total, <b className="num text-rosa">{diferencias.filter((d) => d.dif >= 1).length}</b> barrios reciben
+                más y <b className="num text-celeste">{diferencias.filter((d) => d.dif <= -1).length}</b> menos.
+              </span>
+            )}
+          </div>
+        )}
         {r.sinAsignar > libreTotal * 0.05 && (
           <p className="mt-1.5 flex items-start gap-1.5 text-[11px] text-encurso">
             <TriangleAlert size={13} className="mt-0.5 shrink-0" />
@@ -589,6 +704,7 @@ export function Asignar({
                 [
                   ["total", "Monto total"],
                   ["hogar", "Por hogar"],
+                  ...(diferencias ? [["diferencia", "Diferencia"]] : []),
                 ] as Array<[Vista, string]>
               ).map(([v, t]) => (
                 <button
@@ -601,13 +717,16 @@ export function Asignar({
               ))}
             </div>
             <span className="text-right text-[10px] text-texto-3">
-              Cuanto más rosa, más recibe. Tocá un barrio para ver el detalle.
+              {vista === "diferencia"
+                ? "Rosa: recibe más que en la guardada. Celeste: menos."
+                : "Cuanto más rosa, más recibe. Tocá un barrio para ver el detalle."}
             </span>
           </div>
           <MapaBarrios
             valores={valoresMapa}
-            formatear={(v) => pesos(v, vista === "total")}
-            etiqueta={vista === "total" ? "Asignado" : "Asignado por hogar"}
+            divergente={vista === "diferencia"}
+            formatear={(v) => (vista === "diferencia" ? conSigno(v) : pesos(v, vista === "total"))}
+            etiqueta={vista === "total" ? "Asignado" : vista === "hogar" ? "Asignado por hogar" : "Ahora − guardada"}
             seleccionado={barrio}
             onSeleccionar={setBarrio}
           />
@@ -649,6 +768,7 @@ export function Asignar({
           {seleccion && (
             <QuienInterviene
               barrio={seleccion}
+              ejemplo={ejemplo}
               barrios={datos.barrios}
               politicas={datos.politicas}
               asignaciones={asignacionesBarrio.map((x) => ({
@@ -803,7 +923,7 @@ export function Asignar({
       </details>
 
       {/* Guardar */}
-      <div className="panel-vidrio rounded-2xl p-4">
+      <div ref={guardarRef} className="panel-vidrio scroll-mt-4 rounded-2xl p-4">
         <h3 className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-texto-2 uppercase">
           <Save size={12} className="text-rosa" /> ¿Te sirve este reparto? Guardalo como propuesta
         </h3>
@@ -827,6 +947,7 @@ export function Asignar({
           <>
             <div className="mt-2 grid gap-2 md:grid-cols-[240px_1fr]">
               <input
+                ref={nombreRef}
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 placeholder="Nombre (ej. Plan barrios sur, 2º semestre)"
@@ -886,6 +1007,35 @@ export function Asignar({
       </div>
 
       <MetodoNota />
+
+      {/* Siempre a mano: cuánto se reparte y guardar, sin subir y bajar */}
+      <div className="sticky bottom-2 z-20 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border border-rosa/40 bg-panel/95 px-4 py-2 shadow-lg backdrop-blur">
+        <span className="min-w-0 flex-1 text-[11.5px]">
+          <b className="num text-rosa">{pesos(r.asignado, true)}</b> en <b className="num">{numero(porBarrio.size)}</b>{" "}
+          barrios · {numero(politicasConPlata.length)} políticas
+          {diferencias && (
+            <span className="text-texto-3">
+              {" "}
+              · frente a la guardada {conSigno(r.asignado - [...comparada!.values()].reduce((s, x) => s + x, 0))}
+            </span>
+          )}
+          {recalculando && <span className="text-texto-3"> · recalculando…</span>}
+        </span>
+        {ejemplo ? (
+          <span className="text-[11px] font-bold text-encurso">Ejemplo: no se guarda</span>
+        ) : (
+          <button
+            onClick={() => {
+              guardarRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+              setTimeout(() => nombreRef.current?.focus(), 400);
+            }}
+            disabled={r.asignado <= 0}
+            className="flex items-center gap-1.5 rounded-lg bg-rosa px-3 py-1.5 text-[11px] font-bold text-white transition hover:brightness-110 disabled:opacity-40"
+          >
+            <Save size={12} /> Guardar propuesta
+          </button>
+        )}
+      </div>
     </div>
   );
 }
