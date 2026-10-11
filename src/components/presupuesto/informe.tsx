@@ -168,7 +168,7 @@ export function InformePresupuesto({ id, ejemplo = false }: { id: number; ejempl
 
   if (error)
     return (
-      <div className="mx-auto max-w-3xl px-8 py-10 text-sm">
+      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-8 sm:py-10 print:px-8 text-sm">
         <p className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-red-800">{error}</p>
       </div>
     );
@@ -181,7 +181,7 @@ export function InformePresupuesto({ id, ejemplo = false }: { id: number; ejempl
   const td = "py-0.5 pr-2 align-top";
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-6 text-[11px] leading-snug">
+    <div className="mx-auto max-w-3xl px-4 py-4 sm:px-8 sm:py-6 print:px-8 text-[11px] leading-snug">
       {/* Barra de acciones: no sale impresa */}
       <div className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-neutral-100 px-4 py-2.5 print:hidden">
         <span className="text-xs text-neutral-600">
@@ -231,7 +231,7 @@ export function InformePresupuesto({ id, ejemplo = false }: { id: number; ejempl
           )}
 
           {/* Quién y cuándo */}
-          <div className="mt-3 grid grid-cols-3 gap-3 text-[10.5px]">
+          <div className="mt-3 grid grid-cols-1 gap-3 text-[10.5px] sm:grid-cols-3 print:grid-cols-3">
             <div>
               <div className="font-bold text-neutral-500">Elaboró</div>
               <div>{esc.creado_email || "—"}</div>
@@ -273,7 +273,8 @@ export function InformePresupuesto({ id, ejemplo = false }: { id: number; ejempl
 
           {/* Por política */}
           <div className={seccion}>Por política</div>
-          <table className="w-full">
+          <div className="overflow-x-auto print:overflow-visible">
+          <table className="w-full min-w-[460px] print:min-w-0">
             <thead>
               <tr className="border-b border-neutral-300">
                 <th className={th}>Política</th>
@@ -314,10 +315,12 @@ export function InformePresupuesto({ id, ejemplo = false }: { id: number; ejempl
               </tr>
             </tbody>
           </table>
+</div>
 
           {/* Coordinación entre áreas */}
           <div className={seccion}>Áreas que intervienen</div>
-          <table className="w-full">
+          <div className="overflow-x-auto print:overflow-visible">
+          <table className="w-full min-w-[460px] print:min-w-0">
             <thead>
               <tr className="border-b border-neutral-300">
                 <th className={th}>Área que lidera</th>
@@ -350,6 +353,7 @@ export function InformePresupuesto({ id, ejemplo = false }: { id: number; ejempl
               ))}
             </tbody>
           </table>
+</div>
           <p className="mt-1 text-[9px] text-neutral-500">
             Áreas según el organigrama municipal vigente. La asignación de áreas a cada línea del Plan Rector es una
             propuesta de trabajo a validar con cada secretaría.
@@ -357,7 +361,8 @@ export function InformePresupuesto({ id, ejemplo = false }: { id: number; ejempl
 
           {/* Financiamiento */}
           <div className={seccion}>Financiamiento (Ord. de Contabilidad 570/80)</div>
-          <table className="w-full">
+          <div className="overflow-x-auto print:overflow-visible">
+          <table className="w-full min-w-[460px] print:min-w-0">
             <thead>
               <tr className="border-b border-neutral-300">
                 <th className={th}>Partida</th>
@@ -379,6 +384,7 @@ export function InformePresupuesto({ id, ejemplo = false }: { id: number; ejempl
               ))}
             </tbody>
           </table>
+</div>
 
           {limites.length > 0 && (
             <>
@@ -398,7 +404,8 @@ export function InformePresupuesto({ id, ejemplo = false }: { id: number; ejempl
           {det.ajustes.length > 0 && (
             <>
               <div className={seccion}>Ajustes a mano sobre el criterio</div>
-              <table className="w-full">
+              <div className="overflow-x-auto print:overflow-visible">
+              <table className="w-full min-w-[460px] print:min-w-0">
                 <thead>
                   <tr className="border-b border-neutral-300">
                     <th className={th}>Barrio</th>
@@ -420,6 +427,7 @@ export function InformePresupuesto({ id, ejemplo = false }: { id: number; ejempl
                   ))}
                 </tbody>
               </table>
+</div>
             </>
           )}
 
@@ -451,7 +459,7 @@ export function InformePresupuesto({ id, ejemplo = false }: { id: number; ejempl
 
           {/* Por barrio */}
           <div className={seccion}>Por barrio ({porBarrio.length})</div>
-          <div className="columns-2 gap-6 text-[10px]">
+          <div className="gap-6 text-[10px] sm:columns-2 print:columns-2">
             {porBarrio.map(([b, x]) => (
               <div key={b} className="flex justify-between gap-2 border-b border-neutral-100 py-0.5 break-inside-avoid">
                 <span className="min-w-0 truncate">{b}</span>
@@ -478,7 +486,7 @@ export function InformePresupuesto({ id, ejemplo = false }: { id: number; ejempl
           </p>
 
           {/* Firmas */}
-          <div className="mt-12 grid grid-cols-3 gap-8 text-center text-[10px] break-inside-avoid">
+          <div className="mt-12 grid grid-cols-3 gap-4 text-center text-[10px] break-inside-avoid sm:gap-8">
             {["Elaboró", "Revisó", "Aprobó"].map((r) => (
               <div key={r}>
                 <div className="border-t border-neutral-700 pt-1 font-semibold">{r}</div>

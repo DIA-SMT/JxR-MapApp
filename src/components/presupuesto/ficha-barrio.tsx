@@ -126,7 +126,7 @@ export function FichaBarrio({
 
   if (error)
     return (
-      <div className="mx-auto max-w-3xl px-8 py-10 text-sm">
+      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-8 sm:py-10 print:px-8 text-sm">
         <p className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-red-800">{error}</p>
       </div>
     );
@@ -137,7 +137,7 @@ export function FichaBarrio({
   const totalRecibe = recibe.reduce((s, r) => s + r.a.monto, 0);
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-6 text-[11px] leading-snug">
+    <div className="mx-auto max-w-3xl px-4 py-4 sm:px-8 sm:py-6 print:px-8 text-[11px] leading-snug">
       <div className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-neutral-100 px-4 py-2.5 print:hidden">
         <span className="text-xs text-neutral-600">
           {listo ? "Ficha lista: imprimila o guardala como PDF." : "Armando la ficha del barrio…"}
@@ -177,7 +177,8 @@ export function FichaBarrio({
           {demandas.length === 0 ? (
             <p className="text-neutral-600">Ninguna carencia del censo supera el promedio de la ciudad.</p>
           ) : (
-            <table className="w-full">
+            <div className="overflow-x-auto print:overflow-visible">
+            <table className="w-full min-w-[460px] print:min-w-0">
               <thead>
                 <tr className="border-b border-neutral-300">
                   <th className={th}>Demanda</th>
@@ -201,6 +202,7 @@ export function FichaBarrio({
                 ))}
               </tbody>
             </table>
+</div>
           )}
 
           <div className={seccion}>Qué recibe</div>
@@ -216,7 +218,8 @@ export function FichaBarrio({
                 Según la propuesta «{esc.nombre}» ({esc.estado}
                 {esc.norma ? ` · ${esc.norma}` : ""}): <b className="text-neutral-900">{pesos(totalRecibe)}</b>.
               </p>
-              <table className="w-full">
+              <div className="overflow-x-auto print:overflow-visible">
+              <table className="w-full min-w-[460px] print:min-w-0">
                 <thead>
                   <tr className="border-b border-neutral-300">
                     <th className={th}>Política</th>
@@ -251,6 +254,7 @@ export function FichaBarrio({
                   ))}
                 </tbody>
               </table>
+</div>
             </>
           )}
 
@@ -258,7 +262,8 @@ export function FichaBarrio({
           {areas.length === 0 ? (
             <p className="text-neutral-600">Sin políticas en juego para este barrio.</p>
           ) : (
-            <table className="w-full">
+            <div className="overflow-x-auto print:overflow-visible">
+            <table className="w-full min-w-[460px] print:min-w-0">
               <thead>
                 <tr className="border-b border-neutral-300">
                   <th className={th}>Área</th>
@@ -278,6 +283,7 @@ export function FichaBarrio({
                 ))}
               </tbody>
             </table>
+</div>
           )}
           <p className="mt-1 text-[10px] text-neutral-600">
             Entrada al barrio:{" "}

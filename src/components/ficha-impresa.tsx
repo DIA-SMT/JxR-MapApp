@@ -78,7 +78,7 @@ export function FichaImpresa({ codigo }: { codigo: string }) {
   const seccion = "mb-1 border-b border-neutral-300 pb-0.5 text-[11px] font-extrabold tracking-wide uppercase";
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-6 text-[12px] leading-snug">
+    <div className="mx-auto max-w-3xl px-4 py-4 sm:px-8 sm:py-6 print:px-8 text-[12px] leading-snug">
       {/* Barra de acciones: no sale impresa */}
       <div className="mb-4 flex items-center justify-between rounded-xl bg-neutral-100 px-4 py-2.5 print:hidden">
         <span className="text-xs text-neutral-600">
@@ -105,7 +105,7 @@ export function FichaImpresa({ codigo }: { codigo: string }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+      <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 print:grid-cols-2">
         {/* Padrón */}
         <div>
           <div className={seccion}>Padrón</div>
@@ -260,7 +260,8 @@ export function FichaImpresa({ codigo }: { codigo: string }) {
       {mesas.length > 0 && (
         <div className="mt-4">
           <div className={seccion}>Mesas 2025 más peleadas (nacionales, provisorio)</div>
-          <table className="w-full">
+          <div className="overflow-x-auto print:overflow-visible">
+            <table className="w-full min-w-[460px] print:min-w-0">
             <thead>
               <tr className="border-b border-neutral-400 text-left text-[10px] text-neutral-500 uppercase">
                 <th className="py-0.5 font-bold">Mesa</th>
@@ -284,6 +285,7 @@ export function FichaImpresa({ codigo }: { codigo: string }) {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
