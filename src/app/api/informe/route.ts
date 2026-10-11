@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { conversarConElena } from "@/lib/elena-conversar";
 import { sesionConPerfil } from "@/lib/supabase/servidor";
+import { registrarErrorServidor } from "@/lib/errores-servidor";
 
 export const maxDuration = 60;
 
@@ -39,9 +40,13 @@ export async function POST() {
       .insert({ titulo, contenido: r.respuesta, generado_por: sesion.perfil.id })
       .select("id, titulo, contenido, generado_en")
       .single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      await registrarErrorServidor("api/informe (guardar)", error.message, { id: sesion.perfil.id, email: sesion.perfil.email });
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json({ informe: data, herramientas: r.herramientas });
   } catch (e) {
+    await registrarErrorServidor("api/informe", e, { id: sesion.perfil.id, email: sesion.perfil.email });
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "no pude generar el informe" },
       { status: 502 },

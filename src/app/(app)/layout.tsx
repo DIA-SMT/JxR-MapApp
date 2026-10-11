@@ -5,6 +5,7 @@ import { BotonTema } from "@/components/boton-tema";
 import { LogoJxR } from "@/components/marca";
 import { ElenaChat } from "@/components/elena-chat";
 import { NavApp } from "@/components/nav-app";
+import { RegistroErrores } from "@/components/registro-errores";
 import { sesionConPerfil } from "@/lib/supabase/servidor";
 
 /**
@@ -22,6 +23,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen flex-col">
+      <RegistroErrores />
       <header className="panel-vidrio z-30 flex items-center justify-between gap-2 border-x-0 border-t-0 px-3 py-2 sm:gap-3 sm:px-4">
         <div className="flex min-w-0 items-center gap-3 sm:gap-5">
           <Link href="/" className="shrink-0">

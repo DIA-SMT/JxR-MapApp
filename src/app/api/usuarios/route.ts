@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { sesionConPerfil } from "@/lib/supabase/servidor";
+import { registrarErrorServidor } from "@/lib/errores-servidor";
 
 /**
  * Alta y baja de usuarios — SOLO superadmin. Usa el service role en el server;
@@ -35,7 +36,10 @@ export async function POST(req: NextRequest) {
     password: passwordInicial,
     email_confirm: true,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    await registrarErrorServidor("api/usuarios (alta)", error.message, { id: sesion.perfil.id, email: sesion.perfil.email });
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
 
   const { error: errorPerfil } = await admin.from("perfiles").insert({
     id: data.user.id,
@@ -47,6 +51,7 @@ export async function POST(req: NextRequest) {
   if (errorPerfil) {
     // sin perfil el usuario no puede operar: revertir el alta
     await admin.auth.admin.deleteUser(data.user.id);
+    await registrarErrorServidor("api/usuarios (perfil)", errorPerfil.message, { id: sesion.perfil.id, email: sesion.perfil.email });
     return NextResponse.json({ error: errorPerfil.message }, { status: 400 });
   }
 

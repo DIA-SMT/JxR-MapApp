@@ -167,19 +167,21 @@ export async function guardarConfig(
 
 /** Las 1.087 mesas del padrón provincial, con su escuela y circuito. */
 export async function obtenerMesas(supabase: SupabaseClient): Promise<Mesa[]> {
-  let todas: Mesa[] = [];
-  let desde = 0;
-  for (;;) {
+  const pagina = async (desde: number) => {
     const { data, error } = await supabase
       .from("mesas")
       .select("mesa, escuela, circuito, electores")
       .order("mesa")
       .range(desde, desde + 999);
     if (error) throw new Error(error.message);
-    if (!data || data.length === 0) break;
-    todas = todas.concat(data as Mesa[]);
-    if (data.length < 1000) break;
-    desde += 1000;
+    return (data ?? []) as Mesa[];
+  };
+  // Son ~1.100: las dos primeras páginas juntas ahorran una ida y vuelta (medio segundo).
+  const [a, b] = await Promise.all([pagina(0), pagina(1000)]);
+  let todas = a.length < 1000 ? a : a.concat(b);
+  for (let desde = 2000, ultima = b; a.length === 1000 && ultima.length === 1000; desde += 1000) {
+    ultima = await pagina(desde);
+    todas = todas.concat(ultima);
   }
   return todas;
 }

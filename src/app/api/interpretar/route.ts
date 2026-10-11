@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { CIRCUITOS, esEspacioValido } from "@/lib/espacios";
 import { sesionConPerfil } from "@/lib/supabase/servidor";
+import { registrarErrorServidor } from "@/lib/errores-servidor";
 
 export const maxDuration = 30;
 
@@ -101,7 +102,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ accion: "ir_espacio", tipo, codigo });
     }
     return NextResponse.json(accion);
-  } catch {
+  } catch (e) {
+    await registrarErrorServidor("api/interpretar", e, { id: sesion.perfil.id, email: sesion.perfil.email });
     return NextResponse.json({ accion: "nada", error: "no se pudo interpretar" }, { status: 200 });
   }
 }

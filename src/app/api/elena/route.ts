@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { conversarConElena } from "@/lib/elena-conversar";
 import { sesionConPerfil } from "@/lib/supabase/servidor";
+import { registrarErrorServidor } from "@/lib/errores-servidor";
 
 export const maxDuration = 60;
 
@@ -51,8 +52,8 @@ export async function POST(req: NextRequest) {
       ...(r.accionesMapa.length > 0 ? { accionesMapa: r.accionesMapa } : {}),
     });
   } catch (e) {
-    // que quede en los registros de Vercel: sin esto, un fallo de Elena no deja rastro
-    console.error("[elena] no pudo responder:", e instanceof Error ? e.message : e);
+    // que quede registrado: los registros de Vercel duran una hora
+    await registrarErrorServidor("api/elena", e, { id: sesion.perfil.id, email: sesion.perfil.email });
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Elena no pudo responder" },
       { status: 502 },
