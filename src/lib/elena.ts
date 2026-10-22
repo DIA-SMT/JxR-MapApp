@@ -2,6 +2,8 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CODIGOS, esEspacioValido, etiquetaEspacio } from "./espacios";
 import { META_VOTOS, resolverSeleccion } from "./estrategia";
+import { AREA, AREAS_POLITICA, AREAS_TERRITORIALES, ORGANIGRAMA, cadena, hijos, type Area } from "./organigrama";
+import type { PerfilSocial } from "./analisis";
 import type { AccionMapaElena, Asignacion, Tarea, TipoEspacio } from "./tipos";
 import cruceBarrios from "./datos/barrios-circuitos.json";
 
@@ -416,6 +418,35 @@ export const HERRAMIENTAS_ELENA = [
   {
     type: "function",
     function: {
+      name: "organigrama",
+      description:
+        "ORGANIGRAMA de la Municipalidad (10 secretarías, subsecretarías, direcciones y sus responsables) y qué área LIDERA y en cuáles PARTICIPA cada una de las 63 líneas del Plan Rector 2023-2030. Sin 'buscar' → las secretarías con su responsable. Con 'buscar' → un área, un funcionario, un tema o una línea (por nombre o código, ej 'cloacas', 'arbolado', 'Bonari', '11.2'): de quién depende, quién la dirige, qué tiene a cargo y qué líneas lidera o integra.",
+      parameters: {
+        type: "object",
+        properties: {
+          buscar: { type: "string", description: "área, nombre de un funcionario, tema o código/nombre de una línea del Plan Rector" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "quien_interviene",
+      description:
+        "Para un BARRIO o un CIRCUITO: sus principales demandas según el Censo 2022 (las carencias que superan el promedio de la ciudad, de la más a la menos marcada), qué líneas del Plan Rector las atienden, qué área municipal lidera cada una (con su responsable) y cuáles participan, más las puertas de entrada al barrio. Relaciona territorio ↔ necesidad ↔ política pública ↔ área del municipio. Para coordinar la respuesta de la gestión, no para la campaña.",
+      parameters: {
+        type: "object",
+        properties: {
+          barrio: { type: "string", description: "nombre (o parte) del barrio, ej 'Villa 9 de Julio'" },
+          circuito: { type: "string", description: "código de circuito, ej '15B'" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "ficha_territorial",
       description:
         "PLAN TERRITORIAL del equipo: la ficha operativa de cada circuito o barrio (segmento prioritario, problemática principal, mensaje, propuesta, estrategia de abordaje y si está validada). Con codigo → esa ficha; sin codigo → todas las fichas cargadas (para saber qué territorios ya tienen plan y cuáles faltan). El equipo la edita desde el panel del circuito en el mapa.",
@@ -535,6 +566,94 @@ const avancePorAsignacion = (tareas: Tarea[]) => {
   }
   return mapa;
 };
+
+// ── Organigrama y Plan Rector ───────────────────────────────────────────────
+
+const sinTildes = (t: string) =>
+  t
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+type LineaPlan = { codigo: string; nombre: string; eje: string; indicador: string; tipo: string; activa: boolean };
+
+/** Las líneas del Plan Rector (sin datos de presupuesto): función plan_rector_lineas, migración 0020. */
+async function lineasPlanRector(supabase: SupabaseClient): Promise<LineaPlan[]> {
+  const { data } = await supabase.rpc("plan_rector_lineas");
+  return (data as LineaPlan[] | null) ?? [];
+}
+
+const nombreLinea = (codigo: string, lineas: Map<string, LineaPlan>) => {
+  const l = lineas.get(codigo);
+  return l ? `${codigo} ${l.nombre}${l.activa ? "" : " (inactiva)"}` : codigo;
+};
+
+function fichaArea(x: Area, lineas: Map<string, LineaPlan>) {
+  const lidera = Object.entries(AREAS_POLITICA)
+    .filter(([, r]) => r.lidera === x.id)
+    .map(([c]) => nombreLinea(c, lineas));
+  const participa = Object.entries(AREAS_POLITICA)
+    .filter(([, r]) => r.participan.includes(x.id))
+    .map(([c]) => nombreLinea(c, lineas));
+  return {
+    area: x.nombre,
+    depende_de:
+      cadena(x.id)
+        .slice(0, -1)
+        .map((c) => c.nombre)
+        .join(" › ") || "Intendencia",
+    responsable: x.responsable ?? "sin dato en el organigrama",
+    ...(x.confirmar ? { dependencia_a_confirmar: true } : {}),
+    tiene_a_cargo: hijos(x.id).map((h) => h.nombre),
+    lidera,
+    participa,
+  };
+}
+
+/** Las carencias del censo que se comparan con la ciudad, con la línea del Plan Rector que mide cada una. */
+const DEMANDAS_CENSO: Array<{ indicador: string; etiqueta: string; valor: (p: PerfilSocial) => number | null }> = [
+  { indicador: "nbi", etiqueta: "hogares con NBI", valor: (p) => p.pobreza.pct_nbi },
+  { indicador: "privacion", etiqueta: "hogares con privación", valor: (p) => p.pobreza.pct_privacion },
+  { indicador: "hacinamiento", etiqueta: "hogares con hacinamiento", valor: (p) => p.pobreza.pct_hacinamiento },
+  { indicador: "sin_cloaca", etiqueta: "hogares sin cloaca", valor: (p) => p.servicios.pct_sin_cloaca },
+  { indicador: "sin_agua_red", etiqueta: "hogares sin agua de red", valor: (p) => p.servicios.pct_sin_agua_de_red },
+  { indicador: "desocupados", etiqueta: "desocupación", valor: (p) => p.trabajo.tasa_desocupacion },
+  { indicador: "sin_cobertura_salud", etiqueta: "personas sin cobertura de salud", valor: (p) => p.educacion_salud.pct_sin_cobertura },
+  { indicador: "clima_educativo_bajo", etiqueta: "hogares con clima educativo bajo", valor: (p) => p.educacion_salud.pct_clima_educativo_bajo },
+  { indicador: "poblacion_65_mas", etiqueta: "adultos mayores (65+)", valor: (p) => p.edad.pct_65_y_mas },
+];
+
+/**
+ * Qué áreas del municipio son afines a cada necesidad, aunque ninguna línea
+ * del Plan Rector la mida (pasa con cloacas y agua). Y con qué palabras se la
+ * suele nombrar, para encontrarla al buscar por tema.
+ */
+const AFINES_DEMANDA: Record<string, { areas: string[]; palabras: string[]; nota?: string }> = {
+  sin_cloaca: {
+    areas: ["sec-obras", "sub-obras", "dir-salud-ambiental"],
+    palabras: ["cloaca", "cloacas", "desague", "saneamiento", "pozo"],
+    nota: "Las redes de cloaca y agua dependen en gran parte de la empresa provincial (SAT); en el municipio lo canaliza Obras Públicas.",
+  },
+  sin_agua_red: {
+    areas: ["sec-obras", "sub-obras"],
+    palabras: ["agua", "red de agua"],
+    nota: "Las redes de agua dependen en gran parte de la empresa provincial (SAT); en el municipio lo canaliza Obras Públicas.",
+  },
+  nbi: { areas: ["sub-desarrollo-humano", "sub-desarrollo-social", "dir-programas-sociales"], palabras: ["pobreza", "nbi", "necesidades basicas"] },
+  privacion: { areas: ["sub-desarrollo-social", "dir-programas-sociales"], palabras: ["privacion", "pobreza"] },
+  hacinamiento: { areas: ["sub-desarrollo-social", "dir-familia", "sub-planificacion-urbana"], palabras: ["hacinamiento", "vivienda"] },
+  desocupados: { areas: ["dir-empleo", "dir-programas-sociales"], palabras: ["desocupacion", "desempleo", "trabajo", "empleo", "changas"] },
+  sin_cobertura_salud: { areas: ["dir-salud", "dir-asistencia-publica"], palabras: ["salud", "cobertura", "obra social", "caps", "centro de salud"] },
+  clima_educativo_bajo: { areas: ["dir-educacion", "sub-cultura"], palabras: ["educacion", "escuela", "estudio", "alfabetizacion"] },
+  poblacion_65_mas: { areas: ["dir-adulto-mayor"], palabras: ["adulto mayor", "adultos mayores", "jubilados", "tercera edad"] },
+};
+
+const areasAfines = (indicador: string) =>
+  (AFINES_DEMANDA[indicador]?.areas ?? [])
+    .map((id) => AREA.get(id))
+    .filter((x): x is Area => !!x)
+    .map((x) => `${x.nombre}${x.responsable ? ` (${x.responsable})` : ""}`);
 
 export async function ejecutarHerramientaElena(
   supabase: Supabase,
@@ -1024,6 +1143,168 @@ export async function ejecutarHerramientaElena(
       return { error: "pasá un barrio o un circuito" };
     }
 
+    case "organigrama": {
+      const lineas = new Map((await lineasPlanRector(supabase)).map((l) => [l.codigo, l]));
+      const aviso =
+        "Organigrama municipal vigente (octubre 2026). Qué área lidera cada línea del Plan Rector es una PROPUESTA de trabajo a validar con cada secretaría; las dependencias marcadas 'a confirmar' no se leen con certeza en el organigrama original.";
+      const buscar = args.buscar ? sinTildes(String(args.buscar)) : "";
+      if (!buscar) {
+        return {
+          aviso,
+          secretarias: ORGANIGRAMA.filter((x) => x.tipo === "secretaria").map((x) => {
+            const rama = (id: string): Area[] => hijos(id).flatMap((h) => [h, ...rama(h.id)]);
+            const ids = new Set([x.id, ...rama(x.id).map((h) => h.id)]);
+            return {
+              secretaria: x.nombre,
+              responsable: x.responsable,
+              subsecretarias: hijos(x.id)
+                .filter((h) => h.tipo === "subsecretaria")
+                .map((h) => h.nombre),
+              lineas_que_lidera: Object.values(AREAS_POLITICA).filter((r) => ids.has(r.lidera)).length,
+            };
+          }),
+        };
+      }
+      // líneas del Plan Rector que coinciden (por código o nombre)
+      const lineasHalladas = Object.keys(AREAS_POLITICA)
+        .filter((c) => c === buscar || sinTildes(lineas.get(c)?.nombre ?? "").includes(buscar))
+        .slice(0, 6)
+        .map((c) => {
+          const r = AREAS_POLITICA[c];
+          const lider = AREA.get(r.lidera);
+          return {
+            linea: nombreLinea(c, lineas),
+            eje: lineas.get(c)?.eje ?? "",
+            lidera: lider ? `${lider.nombre}${lider.responsable ? ` (${lider.responsable})` : ""}` : "sin área",
+            depende_de: lider
+              ? cadena(lider.id)
+                  .slice(0, -1)
+                  .map((x) => x.nombre)
+                  .join(" › ")
+              : "",
+            participan: r.participan.map((p) => AREA.get(p)?.nombre ?? p),
+          };
+        });
+      // áreas que coinciden por nombre o por responsable
+      const areasHalladas = ORGANIGRAMA.filter(
+        (x) => sinTildes(x.nombre).includes(buscar) || sinTildes(x.responsable ?? "").includes(buscar),
+      )
+        .slice(0, 6)
+        .map((x) => fichaArea(x, lineas));
+      // temas: una necesidad nombrada como la nombra la gente ("cloacas", "trabajo", "jubilados")
+      const temasHallados = DEMANDAS_CENSO.filter(
+        (d) =>
+          sinTildes(d.etiqueta).includes(buscar) ||
+          (AFINES_DEMANDA[d.indicador]?.palabras ?? []).some((p) => p.includes(buscar) || buscar.includes(p)),
+      ).map((d) => ({
+        tema: d.etiqueta,
+        lineas_del_plan_rector: [...lineas.values()]
+          .filter((l) => l.indicador === d.indicador && l.activa && l.tipo !== "institucional")
+          .map((l) => {
+            const lider = AREA.get(AREAS_POLITICA[l.codigo]?.lidera ?? "");
+            return `${l.codigo} ${l.nombre}${lider ? ` — lidera ${lider.nombre}` : ""}`;
+          }),
+        areas_afines: areasAfines(d.indicador),
+        ...(AFINES_DEMANDA[d.indicador]?.nota ? { nota: AFINES_DEMANDA[d.indicador].nota } : {}),
+      }));
+      if (lineasHalladas.length === 0 && areasHalladas.length === 0 && temasHallados.length === 0) {
+        return {
+          resultado: `nada del organigrama ni del Plan Rector coincide con «${args.buscar}»`,
+          sugerencia: "probá con el nombre de un área (ej 'salud', 'obras'), de un funcionario o el código de una línea (ej '2.2')",
+        };
+      }
+      return {
+        aviso,
+        ...(temasHallados.length ? { temas: temasHallados } : {}),
+        lineas_del_plan_rector: lineasHalladas,
+        areas: areasHalladas,
+      };
+    }
+
+    case "quien_interviene": {
+      const cruce = cruceBarrios as {
+        barrios: Array<{ nombre: string; circuitos: Array<{ circuito: string; pct: number }> }>;
+        por_circuito: Record<string, Array<{ barrio: string; pct: number }>>;
+      };
+      let nivel: "barrio" | "circuito";
+      let codigo: string;
+      let territorio: Record<string, unknown>;
+      if (args.barrio) {
+        const q = sinTildes(String(args.barrio));
+        const candidatos = cruce.barrios.filter((b) => sinTildes(b.nombre).includes(q));
+        const b = candidatos.find((x) => sinTildes(x.nombre) === q) ?? candidatos[0];
+        if (!b) return { error: `ningún barrio del mapa oficial coincide con «${args.barrio}»` };
+        nivel = "barrio";
+        codigo = b.nombre;
+        territorio = {
+          barrio: b.nombre,
+          circuitos: b.circuitos.map((c) => `${c.circuito} (${c.pct}%)`),
+          ...(candidatos.length > 1 ? { otros_barrios_parecidos: candidatos.slice(1, 6).map((x) => x.nombre) } : {}),
+        };
+      } else if (args.circuito) {
+        codigo = String(args.circuito).toUpperCase().trim();
+        if (!esEspacioValido("circuito", codigo)) return { error: `no existe el circuito ${codigo}` };
+        nivel = "circuito";
+        territorio = {
+          circuito: codigo,
+          barrios: (cruce.por_circuito[codigo] ?? []).slice(0, 10).map((f) => f.barrio),
+        };
+      } else return { error: "pasá un barrio o un circuito" };
+
+      const [zona, ciudad, todas] = await Promise.all([
+        supabase.rpc("perfil_social", { p_nivel: nivel, p_codigo: codigo }),
+        supabase.rpc("perfil_social", { p_nivel: "ciudad", p_codigo: null }),
+        lineasPlanRector(supabase),
+      ]);
+      const pz = zona.data as PerfilSocial | null;
+      const pc = ciudad.data as PerfilSocial | null;
+      if (!pz?.poblacion || !pc?.poblacion) return { error: `sin datos censales para ${nivel} ${codigo}` };
+      const lineas = new Map(todas.map((l) => [l.codigo, l]));
+
+      const demandas = DEMANDAS_CENSO.map((d) => ({ d, z: d.valor(pz), c: d.valor(pc) }))
+        .filter((x) => x.z != null && x.c != null && x.c > 0 && (x.z as number) > (x.c as number))
+        .sort((a, b) => (b.z as number) / (b.c as number) - (a.z as number) / (a.c as number))
+        .slice(0, 5)
+        .map(({ d, z, c }) => {
+          const atienden = todas.filter((l) => l.activa && l.tipo !== "institucional" && l.indicador === d.indicador);
+          return {
+            demanda: d.etiqueta,
+            en_la_zona_pct: z,
+            en_la_ciudad_pct: c,
+            veces_la_ciudad: Math.round(((z as number) / (c as number)) * 10) / 10,
+            lineas_que_la_atienden: atienden.map((l) => {
+              const r = AREAS_POLITICA[l.codigo];
+              const lider = r ? AREA.get(r.lidera) : undefined;
+              return {
+                linea: nombreLinea(l.codigo, lineas),
+                lidera: lider ? `${lider.nombre}${lider.responsable ? ` (${lider.responsable})` : ""}` : "sin área asignada",
+                participan: (r?.participan ?? []).map((p) => AREA.get(p)?.nombre ?? p),
+              };
+            }),
+            ...(atienden.length === 0 && todas.length > 0
+              ? { sin_linea: "ninguna línea activa del Plan Rector mide esta necesidad" }
+              : {}),
+            areas_afines: areasAfines(d.indicador),
+            ...(AFINES_DEMANDA[d.indicador]?.nota ? { nota: AFINES_DEMANDA[d.indicador].nota } : {}),
+          };
+        });
+
+      return {
+        ...territorio,
+        principales_demandas: demandas.length
+          ? demandas
+          : "ninguna carencia del censo supera el promedio de la ciudad en esta zona",
+        ...(todas.length === 0
+          ? { aviso: "no pude leer el catálogo del Plan Rector: muestro las áreas afines a cada necesidad, sin las líneas" }
+          : {}),
+        entrada_al_barrio: AREAS_TERRITORIALES.map((id) => {
+          const x = AREA.get(id)!;
+          return `${x.nombre}${x.responsable ? ` (${x.responsable})` : ""}`;
+        }),
+        nota: "Censo 2022 (INDEC) por radio censal: describe la zona, no a personas. Qué área lidera cada línea es una propuesta de trabajo a validar con cada secretaría. Información de GESTIÓN: sirve para coordinar la respuesta del municipio, no para la campaña.",
+      };
+    }
+
     case "ficha_territorial": {
       const nivel = args.nivel === "barrio" ? "barrio" : "circuito";
       const codigo = args.codigo ? String(args.codigo).trim() : null;
@@ -1097,6 +1378,7 @@ Datos electorales que manejás:
 - RESULTADOS 2025 (Diputado Nacional, escrutinio PROVISORIO, mesa a mesa, Capital): 1.350 mesas, 464.795 electores. OJO: la numeración de mesas nacionales NO es la del padrón provincial — 2025 se analiza por mesa y circuito, sin cruce a escuela; la comparación con 2023 es por CIRCUITO (los 47 códigos coinciden).
 - BARRIOS: mapa oficial municipal (327 barrios) cruzado con los circuitos (herramienta barrios).
 - PERFIL SOCIAL (Censo 2022 del INDEC, 671 radios censales de la Capital): población y edades, NBI, hacinamiento, servicios (cloaca, agua), situación laboral (ocupados, desocupados y tasa, relación de dependencia, cuenta propia, servicio doméstico, empleo público, comercio, construcción), clima educativo y cobertura de salud — por circuito, por barrio y de toda la ciudad. Referencias de la ciudad para comparar: NBI 7,7% · hacinamiento 14,6% · sin cloaca 14,1% · desocupación 10,7% · sin cobertura de salud 29,9%.
+- ORGANIGRAMA MUNICIPAL (herramientas organigrama y quien_interviene): las 10 secretarías con sus subsecretarías, direcciones y responsables, y qué área LIDERA y cuáles PARTICIPAN en cada una de las 63 líneas del Plan Rector 2023-2030. Qué área lidera cada línea es una PROPUESTA de trabajo a validar con cada secretaría, y algunas dependencias figuran "a confirmar": decilo cuando lo uses.
 - ESTRATEGIA "voto disperso": identificar escuelas donde las listas peronistas chicas sin banca sumaron votos (típicamente ~100–300 por escuela) y marcar esas escuelas para trabajarlas con referentes, hasta construir un universo de ${META_VOTOS.toLocaleString("es-AR")} votos. La preselección de listas es editable en la pantalla Estrategia.
 
 Sos un ANALISTA ESTRATÉGICO, no solo un buscador de resultados. Método de trabajo:
@@ -1105,6 +1387,7 @@ Sos un ANALISTA ESTRATÉGICO, no solo un buscador de resultados. Método de trab
 - Cuando te pidan un plan territorial, combiná: potencial_electoral (prioridades) + oportunidades (metas concretas de votos) + estado del operativo (dónde falta referente/fiscal) + barrios (para nombrar el territorio como lo conoce la gente) + perfil_social (qué perfil tiene la gente de esa zona). Cerrá siempre con acciones: dónde poner estructura, cuántos votos se buscan ahí y por qué.
 - FICHAS TERRITORIALES: el plan por territorio (segmento, problemática, mensaje, propuesta, abordaje) vive en ficha_territorial. Consultala antes de proponer un plan (para no pisar lo definido) y cuando te pidan un BORRADOR de ficha, armalo con esa estructura exacta de 5 campos, cada uno en una línea con el nombre en negrita, listo para copiar en el panel del circuito.
 - VOTO + PERFIL SOCIAL: cuando cruces ambos, el perfil social sirve para elegir el MENSAJE y la PROPUESTA de cada territorio, no para predecir el voto de nadie. Ej: una zona con desocupación muy por encima del 10,7% de la ciudad y clima educativo bajo pide agenda de trabajo y oficios; una con muchos adultos mayores pide salud y previsión; una con hogares sin cloaca pide infraestructura. Siempre comparás el dato de la zona contra el de la ciudad para decir si está mejor o peor, y decís de qué indicador surge la conclusión.
+- GESTIÓN Y ORGANIGRAMA: para "¿quién se encarga de X?", "¿qué área atiende la falta de cloacas?", "¿a quién hay que coordinar en el barrio Y?" usá organigrama y quien_interviene. Relacioná todo: el barrio con sus circuitos (barrios), su necesidad frente a la ciudad (perfil_social), las líneas del Plan Rector que la atienden y el área que lidera con su responsable. Nombrá siempre el área y la persona a cargo.
 - Lo que el censo NO dice: cómo vota una persona, ni su problemática individual. Si te piden ese cruce a nivel individuo, explicá que el análisis es por zona y ofrecé el agregado.
 - Los análisis por mesa son los más finos pero devuelven muchos espacios: arrancá por circuito o escuela y bajá a mesa cuando haga falta puntería.
 - Si preguntan por una MESA puntual sin aclarar la elección, asumí 2025 (los paneles de la app muestran las mesas nacionales 2025) y aclaralo en una frase; ofrecé el 2023 como opción solo después de responder. «Dar vuelta» una mesa o circuito = que el 2º supere al 1º: respondé quién gana, quién está segundo y cuántos votos le faltan (diferencia + 1), más blancos y ausentes como bolsa — SIN pedir que te aclaren la agrupación. Regla general: ante ambigüedad, elegí el supuesto más razonable, respondé, y al final aclarás qué asumiste — NUNCA frenes el análisis para repreguntar.
@@ -1114,6 +1397,8 @@ Privacidad y límites (IMPORTANTES):
 - El padrón se usa para logística y soporte (dónde vota la gente, cuántos son, dónde se concentran). NUNCA especules ni permitas inferir la orientación política, religiosa o social de una persona individual: el voto es secreto y el análisis político es SIEMPRE agregado (por escuela, circuito o cohorte).
 - No inventes datos: si una herramienta no lo devuelve, no existe.
 - Presupuesto público: NO tenés acceso a la herramienta de asignación presupuestaria y NUNCA recomiendes dirigir gasto, obras, programas o cupos del municipio según su rendimiento electoral (dónde se ganan o se pierden votos, dónde conviene "invertir" para la campaña). Usar recursos públicos con fin electoral está prohibido (malversación, Código Penal art. 260; y en los 30 días previos a la elección, Ley 7876 art. 34). Si te lo piden, decí que no lo hacés, explicá por qué en una línea y aclará que la asignación del presupuesto se hace en la sección Presupuesto con criterios de necesidad social del censo.
+
+- Gestión municipal y campaña van separadas: el organigrama sirve para que el municipio responda a las necesidades de cada barrio. NUNCA propongas usar áreas, funcionarios, empleados, programas, móviles, eventos o recursos municipales a favor de la campaña (mandarlos adonde se pierden votos, condicionarlos al voto, convertir una acción de gobierno en acto proselitista o pedirle a un funcionario tareas de campaña): es uso de recursos públicos con fin electoral (Código Penal art. 260; Ley de Ética Pública 25.188; en la veda, Ley 7876 art. 34). Si te lo piden, decí que no lo hacés en una línea. Lo único que podés ofrecer a cambio es ver dónde hay más necesidad en TODA la ciudad (ranking_social, quien_interviene), SIN filtrar ni ordenar por resultados electorales: la prioridad de la gestión la marca la necesidad, nunca el voto. No propongas cruzar dónde se ganan o pierden votos con dónde debería actuar el municipio. Tampoco atribuyas afiliación ni posición política a funcionarios o empleados.
 
 Acción sobre el mapa:
 - Si el usuario pide VER algo ("mostrame el circuito 15B", "llevame al distrito 7", "dónde está el 18G"), usá accionar_mapa: el mapa lo selecciona y lo encuadra; si no estaba en el mapa, la app lo lleva sola.

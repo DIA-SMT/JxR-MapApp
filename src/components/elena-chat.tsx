@@ -46,6 +46,8 @@ const SUGERENCIAS = [
   "Compará el 2023 con el 2025 por circuito: ¿dónde crecimos y dónde caímos?",
   "¿Dónde vota Pérez Juan?",
   "¿Cómo viene la estrategia contra la meta de 20.000?",
+  "¿Qué necesita Villa 9 de Julio y qué áreas del municipio tienen que intervenir?",
+  "¿Quién se ocupa del arbolado y de quién depende?",
 ];
 
 /** Elena — el asistente del comando territorial — flotante en toda la app. */
